@@ -14,17 +14,17 @@ describe('CreateDraft', () => {
   });
 
   it('requires "to" or "thread_id"', async () => {
-    await expect(uc.execute({ body: 'hi' })).rejects.toThrow(new DomainError('Se necesita "to" o "thread_id"'));
-    await expect(uc.execute({ to: [], body: 'hi' })).rejects.toThrow('Se necesita "to" o "thread_id"');
+    await expect(uc.execute({ body: 'hi' })).rejects.toThrow(new DomainError('Either "to" or "thread_id" is required'));
+    await expect(uc.execute({ to: [], body: 'hi' })).rejects.toThrow('Either "to" or "thread_id" is required');
   });
 
   it('creates a draft for the given recipients and builds the gmail url', async () => {
     const create = vi.spyOn(f.providers.get('a1')!.mail, 'createDraft');
-    const r = await uc.execute({ to: ['Ana <ana@client.com>'], cc: ['bob@client.com'], subject: 'Hola', body: 'hi' });
+    const r = await uc.execute({ to: ['Ana <ana@client.com>'], cc: ['bob@client.com'], subject: 'Hello', body: 'hi' });
     expect(create).toHaveBeenCalledTimes(1);
     expect(create.mock.calls[0]![0].cc!.map((a) => a.address)).toEqual(['bob@client.com']);
     expect(r.to).toEqual(['ana@client.com']);
-    expect(r.subject).toBe('Hola');
+    expect(r.subject).toBe('Hello');
     expect(r.gmailUrl).toBe(`https://mail.google.com/mail/#drafts?compose=${r.draftId}`);
   });
 
@@ -38,9 +38,9 @@ describe('CreateDraft', () => {
   });
 
   it('rejects invalid addresses and inactive accounts', async () => {
-    await expect(uc.execute({ to: ['nope'], body: 'x' })).rejects.toThrow(new DomainError('Dirección inválida: nope'));
-    await expect(uc.execute({ to: ['a@b.com'], cc: ['bad'], body: 'x' })).rejects.toThrow('Dirección inválida: bad');
+    await expect(uc.execute({ to: ['nope'], body: 'x' })).rejects.toThrow(new DomainError('Invalid address: nope'));
+    await expect(uc.execute({ to: ['a@b.com'], cc: ['bad'], body: 'x' })).rejects.toThrow('Invalid address: bad');
     await f.addAccount('a2', 'needs_reauth');
-    await expect(uc.execute({ to: ['a@b.com'], body: 'x', accountId: 'a2' })).rejects.toThrow('Cuenta no activa: a2');
+    await expect(uc.execute({ to: ['a@b.com'], body: 'x', accountId: 'a2' })).rejects.toThrow('Account not active: a2');
   });
 });

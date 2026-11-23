@@ -4,9 +4,9 @@ import { vi } from 'vitest';
 type Task = tasks_v1.Schema$Task;
 
 export interface FakeTasksOptions {
-  /** Reloj; por defecto `Date.now`. El fake lo hace estrictamente creciente. */
+  /** Clock; defaults to `Date.now`. The fake makes it strictly increasing. */
   now?: () => number;
-  /** Tamaño de página (para ejercitar la paginación). */
+  /** Page size (to exercise pagination). */
   pageSize?: number;
 }
 
@@ -19,7 +19,7 @@ interface ListParams {
   pageToken?: string;
 }
 
-/** Google Tasks en memoria: implementa el subconjunto de `tasks_v1.Tasks` que usa el adaptador. */
+/** In-memory Google Tasks: implements the subset of `tasks_v1.Tasks` the adapter uses. */
 export class FakeTasks {
   readonly calls = {
     tasksList: vi.fn(),
@@ -47,7 +47,7 @@ export class FakeTasks {
     },
   };
 
-  /** Google crea una lista por defecto al abrir la cuenta. */
+  /** Google creates a default list when the account is opened. */
   constructor(opts: FakeTasksOptions = {}) {
     this.now = opts.now ?? Date.now;
     this.pageSize = opts.pageSize ?? 100;

@@ -25,7 +25,7 @@ export interface Authorizer {
 
 export interface LoadedConfig {
   readonly config: JarvisConfig;
-  /** Directorio del archivo de configuración; base de las rutas relativas. */
+  /** Directory of the config file; base for relative paths. */
   readonly dir: string;
 }
 
@@ -55,17 +55,17 @@ export function buildProgram(deps: CliDeps): Command {
 
   program
     .command('auth')
-    .description('Autoriza una cuenta de Google y guarda su token')
-    .requiredOption('--account <id>', 'id de la cuenta definida en la configuración')
+    .description('Authorize a Google account and store its token')
+    .requiredOption('--account <id>', 'account id as defined in the config')
     .action(async (opts: { account: string }) => {
       try {
         const { config, dir } = deps.loadConfig();
         if (!config.accounts.some((a) => a.id === opts.account)) {
           const ids = config.accounts.map((a) => a.id).join(', ') || '(ninguna)';
-          throw new Error(`La cuenta "${opts.account}" no existe en la configuración. Cuentas configuradas: ${ids}`);
+          throw new Error(`Account "${opts.account}" is not in the config. Configured accounts: ${ids}`);
         }
         await deps.createAuthorizer(authPaths(config, dir)).authorizeInteractive(opts.account);
-        deps.out(`Token guardado para ${opts.account}`);
+        deps.out(`Token saved for ${opts.account}`);
       } catch (error) {
         fail(deps, error);
       }
@@ -73,7 +73,7 @@ export function buildProgram(deps: CliDeps): Command {
 
   program
     .command('migrate')
-    .description('Aplica las migraciones pendientes de la base de datos (DATABASE_URL)')
+    .description('Apply pending database migrations (DATABASE_URL)')
     .action(async () => {
       try {
         await deps.migrate(deps.databaseUrl());
@@ -85,13 +85,13 @@ export function buildProgram(deps: CliDeps): Command {
 
   program
     .command('sync')
-    .description('Sincroniza las cuentas activas una vez e imprime un resumen JSON')
-    .option('--once', 'una sola corrida (obligatorio; el worker sincroniza periódicamente)')
-    .option('--account <id>', 'sólo esta cuenta (debe estar activa)')
+    .description('Sync the active accounts once and print a JSON summary')
+    .option('--once', 'a single run (required; the worker syncs periodically)')
+    .option('--account <id>', 'only this account (must be active)')
     .action(async (opts: { once?: boolean; account?: string }) => {
       let outcomes: AccountSyncOutcome[];
       try {
-        if (!opts.once) throw new Error('Usá "sync --once": la sincronización periódica la hace el worker');
+        if (!opts.once) throw new Error('Use "sync --once": periodic sync is done by the worker');
         const { config, dir } = deps.loadConfig();
         const session = await deps.openSync({ config, configDir: dir, databaseUrl: deps.databaseUrl() });
         try {

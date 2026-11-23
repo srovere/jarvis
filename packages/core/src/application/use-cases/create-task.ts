@@ -22,11 +22,11 @@ export class CreateTask {
     const due = q.due === undefined ? undefined : this.parseDue(q.due);
     const account = await selectAccount(this.accounts, q.accountId);
     const bundle = await this.registry.forAccount(account);
-    if (!bundle.tasks) throw new DomainError(`La cuenta ${account.id} no soporta tareas`);
+    if (!bundle.tasks) throw new DomainError(`Account ${account.id} does not support tasks`);
 
     const lists = await this.knownLists(account, bundle, q.listId);
     const listId = q.listId ?? lists.find((l) => l.isDefault)?.id;
-    if (!listId) throw new DomainError(`La cuenta ${account.id} no tiene lista de tareas por defecto`);
+    if (!listId) throw new DomainError(`Account ${account.id} has no default task list`);
     const task = await bundle.tasks.createTask(listId, {
       title: q.title,
       ...(q.notes !== undefined ? { notes: q.notes } : {}),
@@ -38,7 +38,7 @@ export class CreateTask {
 
   private parseDue(due: string): DateTime {
     const dt = /^\d{4}-\d{2}-\d{2}$/.test(due) ? DateTime.fromISO(due, { zone: this.settings.zone }) : null;
-    if (!dt?.isValid) throw new DomainError(`Fecha inválida: ${due}`);
+    if (!dt?.isValid) throw new DomainError(`Invalid date: ${due}`);
     return dt.startOf('day');
   }
 

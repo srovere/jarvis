@@ -52,12 +52,12 @@ describe('readBearerToken', () => {
   });
 
   it('fails fast when the file is missing', () => {
-    expect(() => readBearerToken(join(dir, 'missing'))).toThrow(/No se pudo leer el token MCP/);
+    expect(() => readBearerToken(join(dir, 'missing'))).toThrow(/Could not read the MCP token/);
   });
 
   it('fails fast when the file is empty', () => {
     const path = join(dir, 'empty');
     writeFileSync(path, ' \n');
-    expect(() => readBearerToken(path)).toThrow(/token MCP .* está vacío/);
+    expect(() => readBearerToken(path)).toThrow(/MCP token file .* is empty/);
   });
 });

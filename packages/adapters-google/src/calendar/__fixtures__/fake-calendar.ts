@@ -8,9 +8,9 @@ interface Stored {
 }
 
 export interface FakeCalendarOptions {
-  /** Calendarios de `calendarList.list`; el primero es `primary`. */
+  /** Calendars of `calendarList.list`; the first one is `primary`. */
   calendars?: string[];
-  /** Tamaño de página (para ejercitar la paginación). */
+  /** Page size (to exercise pagination). */
   pageSize?: number;
 }
 
@@ -21,7 +21,7 @@ const instant = (t: calendar_v3.Schema$EventDateTime | undefined): number | unde
   return undefined;
 };
 
-/** Google Calendar en memoria: implementa el subconjunto de `calendar_v3.Calendar` que usa el adaptador. */
+/** In-memory Google Calendar: implements the subset of `calendar_v3.Calendar` the adapter uses. */
 export class FakeCalendar {
   readonly calls = { eventsList: vi.fn(), eventsInsert: vi.fn(), calendarListList: vi.fn() };
 
@@ -55,7 +55,7 @@ export class FakeCalendar {
     this.put(calendarId, event);
   }
 
-  /** Cancela un evento: queda como tombstone `status: 'cancelled'`. */
+  /** Cancels an event: it stays as a `status: 'cancelled'` tombstone. */
   cancel(calendarId: string, id: string): void {
     const cur = this.store.get(calendarId)?.get(id);
     if (cur) this.put(calendarId, { ...cur.event, status: 'cancelled' });

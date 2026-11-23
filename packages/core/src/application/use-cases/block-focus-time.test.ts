@@ -115,7 +115,7 @@ describe('BlockFocusTime', () => {
 
   it('rejects an account that needs reauth, and fails without active accounts', async () => {
     await f.addAccount('a2', 'needs_reauth');
-    await expect(build().execute({ taskName: 'X', accountId: 'a2' })).rejects.toThrow(new DomainError('Cuenta no activa: a2'));
+    await expect(build().execute({ taskName: 'X', accountId: 'a2' })).rejects.toThrow(new DomainError('Account not active: a2'));
     const empty = new UseCaseFixture();
     await empty.addAccount('z', 'needs_reauth');
     const b = new BlockFocusTime(
@@ -125,6 +125,6 @@ describe('BlockFocusTime', () => {
       empty.registry,
       settings,
     );
-    await expect(b.execute({ taskName: 'X' })).rejects.toThrow('No hay cuentas activas');
+    await expect(b.execute({ taskName: 'X' })).rejects.toThrow('No active accounts');
   });
 });

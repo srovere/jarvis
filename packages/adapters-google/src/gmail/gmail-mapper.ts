@@ -7,7 +7,7 @@ type GmailMessage = gmail_v1.Schema$Message;
 type GmailPart = gmail_v1.Schema$MessagePart;
 type GmailThread = gmail_v1.Schema$Thread;
 
-/** Remitente de reserva cuando el header From falta o no se puede interpretar. */
+/** Fallback sender when the From header is missing or cannot be parsed. */
 const UNKNOWN_SENDER = 'unknown@unknown.invalid';
 
 export function headerValue(part: GmailPart | undefined, name: string): string | undefined {
@@ -27,7 +27,7 @@ function charsetOf(contentType: string | undefined): string | undefined {
   return /charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType ?? '')?.[1];
 }
 
-/** Decodifica encoded-words RFC 2047 (`=?charset?B|Q?...?=`) de un header. */
+/** Decodes RFC 2047 encoded-words (`=?charset?B|Q?...?=`) in a header. */
 export function decodeMimeWords(value: string): string {
   return value
     .replace(/(\?=)\s+(?==\?)/g, '$1')
@@ -43,7 +43,7 @@ export function decodeMimeWords(value: string): string {
     });
 }
 
-/** Separa una lista de direcciones por comas de nivel superior (respetando comillas y `<...>`). */
+/** Splits an address list on top-level commas (honouring quotes and `<...>`). */
 function splitAddressList(value: string): string[] {
   const parts: string[] = [];
   let current = '';
@@ -67,14 +67,14 @@ function splitAddressList(value: string): string[] {
   return parts.map((p) => p.trim()).filter((p) => p !== '');
 }
 
-/** Interpreta un header de direcciones; las que no se pueden interpretar se omiten. */
+/** Parses an address header; addresses that cannot be parsed are skipped. */
 export function parseAddressHeader(value: string | undefined): EmailAddress[] {
   const out: EmailAddress[] = [];
   for (const piece of splitAddressList(value ?? '')) {
     try {
       out.push(EmailAddress.parse(decodeMimeWords(piece)));
     } catch {
-      // dirección ilegible: se omite sin registrar su contenido
+      // unreadable address: skipped without logging its content
     }
   }
   return out;
@@ -94,7 +94,7 @@ function decodePart(part: GmailPart | undefined): string | undefined {
   return safeDecode(Buffer.from(part.body.data, 'base64url'), charsetOf(headerValue(part, 'Content-Type')));
 }
 
-/** Traduce objetos de la API de Gmail al modelo de dominio. */
+/** Maps Gmail API objects to the domain model. */
 export class GmailMapper {
   constructor(private readonly accountId: string) {}
 

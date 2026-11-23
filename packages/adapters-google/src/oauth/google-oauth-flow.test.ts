@@ -105,7 +105,7 @@ describe('GoogleOAuthFlow', () => {
       expect(redirect.hostname).toBe('127.0.0.1');
       expect(redirect.pathname).toBe('/oauth2callback');
       const res = await fetch(`${redirect.origin}/oauth2callback?code=abc&state=${url.searchParams.get('state')}`);
-      expect(await res.text()).toContain('Listo, podés cerrar esta pestaña.');
+      expect(await res.text()).toContain('Done, you can close this tab.');
       await done;
       expect(getToken).toHaveBeenCalledWith('abc');
       expect(await store.read('personal')).toEqual({ refresh_token: 'r1', access_token: 'a1' });
@@ -152,7 +152,7 @@ describe('GoogleOAuthFlow', () => {
 
     it('times out with a clear error', async () => {
       const flow = new GoogleOAuthFlow(secretPath, store, { port: 0, timeoutMs: 20 });
-      await expect(flow.authorizeInteractive('personal')).rejects.toThrow(/Tiempo de espera agotado/);
+      await expect(flow.authorizeInteractive('personal')).rejects.toThrow(/Timed out/);
     });
   });
 });

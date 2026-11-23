@@ -16,7 +16,7 @@ const hasStatus = (e: unknown, status: number): boolean => {
 
 export const isNotFound = (e: unknown): boolean => hasStatus(e, 404);
 
-/** 410: el cursor (`syncToken`) ya no es válido. */
+/** 410: the cursor (`syncToken`) is no longer valid. */
 export const isGone = (e: unknown): boolean => hasStatus(e, 410);
 
 export function isInvalidGrant(e: unknown): boolean {
@@ -24,7 +24,7 @@ export function isInvalidGrant(e: unknown): boolean {
   return err.response?.data?.error === 'invalid_grant' || err.code === 'invalid_grant' || err.message === 'invalid_grant';
 }
 
-/** Desenvuelve `data` y traduce `invalid_grant` a `ReauthRequired`; el resto de errores se propaga. */
+/** Unwraps `data` and maps `invalid_grant` to `ReauthRequired`; other errors propagate. */
 export async function callGoogle<T>(accountId: string, request: () => Promise<{ data: T }>): Promise<T> {
   try {
     return (await request()).data;

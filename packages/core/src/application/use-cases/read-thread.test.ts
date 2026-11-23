@@ -15,7 +15,7 @@ describe('ReadThread', () => {
     a2.mail.seed([
       thread([
         message('n2', 'u1', 'a2', MONDAY_20.minus({ hours: 1 }), { bodyText: 'Respuesta\n> cita' }),
-        message('n1', 'u1', 'a2', MONDAY_20.minus({ hours: 2 }), { bodyText: 'Hola' }),
+        message('n1', 'u1', 'a2', MONDAY_20.minus({ hours: 2 }), { bodyText: 'Hello' }),
       ]),
     ]);
   });
@@ -25,7 +25,7 @@ describe('ReadThread', () => {
     expect(r.threadId).toBe('u1');
     expect(r.subject).toBe('Subject u1');
     expect(r.messages.map((m) => [m.id, m.body, m.date])).toEqual([
-      ['n1', 'Hola', '2026-11-23T18:00:00.000-03:00'],
+      ['n1', 'Hello', '2026-11-23T18:00:00.000-03:00'],
       ['n2', 'Respuesta', '2026-11-23T19:00:00.000-03:00'],
     ]);
   });

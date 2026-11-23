@@ -74,7 +74,7 @@ export class EmailCleaner {
 
     if (!text) return this.cleanSnippet(m.snippet);
     if (text.length <= this.maxChars) return text;
-    return `${text.slice(0, this.maxChars)}\n[… truncado, ${text.length} caracteres en total]`;
+    return `${text.slice(0, this.maxChars)}\n[… truncated, ${text.length} chars total]`;
   }
 
   cleanSnippet(s: string): string {

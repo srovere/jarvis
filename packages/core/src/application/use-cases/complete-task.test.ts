@@ -26,6 +26,6 @@ describe('CompleteTask', () => {
   });
 
   it('fails for an unknown task', async () => {
-    await expect(uc.execute({ taskId: 'nope' })).rejects.toThrow('Tarea no encontrada: nope');
+    await expect(uc.execute({ taskId: 'nope' })).rejects.toThrow('Task not found: nope');
   });
 });

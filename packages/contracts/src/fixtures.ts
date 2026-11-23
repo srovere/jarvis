@@ -28,7 +28,7 @@ export function buildMessage(spec: MessageSpec): MailMessage {
     from: addr(spec.from),
     to: spec.to.map(addr),
     cc: (spec.cc ?? []).map(addr),
-    subject: spec.subject ?? 'Hola',
+    subject: spec.subject ?? 'Hello',
     date: T0.plus({ minutes: spec.minutes }),
     snippet: `snippet ${spec.id}`,
     labels: ['INBOX'],

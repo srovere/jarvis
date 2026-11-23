@@ -8,11 +8,11 @@ export interface ToolOutput {
   structured: object;
 }
 
-const INTERNAL_ERROR = 'Error interno';
+const INTERNAL_ERROR = 'Internal error';
 
 /**
  * Runs a tool body and shapes the MCP result. A `DomainError` becomes a tool error with its message; any other
- * error becomes a generic "Error interno" (details go to the log, never to the client).
+ * error becomes a generic "Internal error" (details go to the log, never to the client).
  */
 @Injectable()
 export class ToolRunner {
@@ -25,7 +25,7 @@ export class ToolRunner {
     } catch (e) {
       if (e instanceof DomainError) return this.error(e.message);
       const detail = e instanceof Error ? e.message : String(e);
-      this.logger.error(`La herramienta ${tool} falló: ${detail}`, e instanceof Error ? e.stack : undefined);
+      this.logger.error(`Tool ${tool} failed: ${detail}`, e instanceof Error ? e.stack : undefined);
       return this.error(INTERNAL_ERROR);
     }
   }

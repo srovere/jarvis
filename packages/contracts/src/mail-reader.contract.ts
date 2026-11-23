@@ -16,7 +16,7 @@ export function describeMailReaderContract(name: string, setup: () => Promise<Ma
     it('getThread returns messages in chronological order', async () => {
       const { reader, seed } = await setup();
       await seed([
-        buildThread('t1', 'Hola', [
+        buildThread('t1', 'Hello', [
           buildMessage({ id: 'm2', threadId: 't1', from: 'a@y.com', to: ['me@x.com'], minutes: 10 }),
           buildMessage({ id: 'm3', threadId: 't1', from: 'me@x.com', to: ['a@y.com'], minutes: 20 }),
           buildMessage({ id: 'm1', threadId: 't1', from: 'a@y.com', to: ['me@x.com'], minutes: 0 }),
@@ -36,7 +36,7 @@ export function describeMailReaderContract(name: string, setup: () => Promise<Ma
       const { reader, seed } = await setup();
       await seed(
         ['t1', 't2', 't3'].map((id, i) =>
-          buildThread(id, 'Hola', [
+          buildThread(id, 'Hello', [
             buildMessage({ id: `${id}-m1`, threadId: id, from: 'a@y.com', to: ['me@x.com'], minutes: i }),
           ]),
         ),
@@ -49,7 +49,7 @@ export function describeMailReaderContract(name: string, setup: () => Promise<Ma
     it('sync(null) returns a full resync with a non-empty cursor and the seeded messages', async () => {
       const { reader, seed } = await setup();
       await seed([
-        buildThread('t1', 'Hola', [
+        buildThread('t1', 'Hello', [
           buildMessage({ id: 'm1', threadId: 't1', from: 'a@y.com', to: ['me@x.com'], minutes: 0 }),
         ]),
       ]);
@@ -62,7 +62,7 @@ export function describeMailReaderContract(name: string, setup: () => Promise<Ma
     it('sync(nextCursor) without changes returns no changes', async () => {
       const { reader, seed } = await setup();
       await seed([
-        buildThread('t1', 'Hola', [
+        buildThread('t1', 'Hello', [
           buildMessage({ id: 'm1', threadId: 't1', from: 'a@y.com', to: ['me@x.com'], minutes: 0 }),
         ]),
       ]);

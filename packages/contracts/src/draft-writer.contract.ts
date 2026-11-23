@@ -18,14 +18,14 @@ export function describeDraftWriterContract(name: string, setup: () => Promise<D
       const { writer, reader, seed, own } = await setup();
       const me = own[0]!.address;
       await seed([
-        buildThread('t1', 'Hola', [
+        buildThread('t1', 'Hello', [
           buildMessage({ id: 'm1', threadId: 't1', from: 'a@y.com', to: [me], minutes: 0 }),
         ]),
       ]);
       expect((await reader.getThread('t1')).id).toBe('t1');
       const ref = await writer.createDraft({ threadId: 't1', body: 'ok' });
       expect(addresses(ref.to)).toEqual(['a@y.com']);
-      expect(ref.subject).toBe('Re: Hola');
+      expect(ref.subject).toBe('Re: Hello');
       expect(ref.threadId).toBe('t1');
       expect(ref.draftId).not.toBe('');
     });
@@ -33,12 +33,12 @@ export function describeDraftWriterContract(name: string, setup: () => Promise<D
     it('does not duplicate the Re: prefix', async () => {
       const { writer, seed, own } = await setup();
       await seed([
-        buildThread('t1', 'Re: Hola', [
-          buildMessage({ id: 'm1', threadId: 't1', from: 'a@y.com', to: [own[0]!.address], minutes: 0, subject: 'Re: Hola' }),
+        buildThread('t1', 'Re: Hello', [
+          buildMessage({ id: 'm1', threadId: 't1', from: 'a@y.com', to: [own[0]!.address], minutes: 0, subject: 'Re: Hello' }),
         ]),
       ]);
       const ref = await writer.createDraft({ threadId: 't1', body: 'ok' });
-      expect(ref.subject).toBe('Re: Hola');
+      expect(ref.subject).toBe('Re: Hello');
       expect(ref.subject).not.toMatch(/^Re:\s*Re:/i);
     });
 
@@ -46,7 +46,7 @@ export function describeDraftWriterContract(name: string, setup: () => Promise<D
       const { writer, seed, own } = await setup();
       const me = own[0]!.address;
       await seed([
-        buildThread('t1', 'Hola', [
+        buildThread('t1', 'Hello', [
           buildMessage({ id: 'm1', threadId: 't1', from: 'b@y.com', to: [me], minutes: 0 }),
           buildMessage({ id: 'm2', threadId: 't1', from: me, to: ['b@y.com'], minutes: 5 }),
         ]),
@@ -58,9 +58,9 @@ export function describeDraftWriterContract(name: string, setup: () => Promise<D
 
     it('uses the explicit recipients and subject when given', async () => {
       const { writer } = await setup();
-      const ref = await writer.createDraft({ to: [addr('c@y.com')], subject: 'Asunto', body: 'hola' });
+      const ref = await writer.createDraft({ to: [addr('c@y.com')], subject: 'Subject', body: 'hello' });
       expect(addresses(ref.to)).toEqual(['c@y.com']);
-      expect(ref.subject).toBe('Asunto');
+      expect(ref.subject).toBe('Subject');
     });
 
     it('rejects a draft without recipients and without a thread', async () => {

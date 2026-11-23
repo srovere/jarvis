@@ -1,53 +1,54 @@
 # Jarvis
 
-Asistente personal para el trabajo diario. La fase 1 sincroniza Gmail, Google Calendar y Google Tasks a una base
-PostgreSQL local y los expone a Claude (Claude Code, Claude Desktop, MCP Inspector) mediante un servidor MCP sobre
-HTTP. Jarvis no llama a ningún modelo ni usa API keys de Anthropic: el modelo es el cliente MCP que tú uses.
+Personal assistant for daily work. Phase 1 syncs Gmail, Google Calendar and Google Tasks into a local PostgreSQL
+database and exposes them to Claude (Claude Code, Claude Desktop, MCP Inspector) through an MCP server over HTTP.
+Jarvis does not call any model and uses no Anthropic API keys: the model is whichever MCP client you use.
 
-**Jarvis nunca envía correos.** No existe ninguna herramienta ni método de envío; sólo puede crear borradores
-(`create_gmail_draft`) que revisas y envías tú desde Gmail.
+**Jarvis never sends email.** There is no send tool or method; it can only create drafts (`create_gmail_draft`)
+that you review and send yourself from Gmail.
 
-## Arquitectura
+## Architecture
 
-- `db`: PostgreSQL 17 (volumen `pgdata`, sin puertos publicados).
-- `migrate`: aplica las migraciones y termina.
-- `worker`: sincroniza cada cuenta cada 5 minutos (configurable).
-- `mcp-server`: herramientas MCP en `http://127.0.0.1:3002/mcp` (sólo escucha en `127.0.0.1` del host; exige
+- `db`: PostgreSQL 17 (`pgdata` volume, no published ports).
+- `migrate`: applies the migrations and exits.
+- `worker`: syncs every account every 5 minutes (configurable).
+- `mcp-server`: MCP tools at `http://127.0.0.1:3002/mcp` (listens on the host's `127.0.0.1` only; requires
   `Authorization: Bearer <token>`).
 
-Los secretos viven en `secrets/` (git-ignorado) y se montan como Docker secrets. Los tokens OAuth de Google se guardan
-(permisos `0600`) en el volumen `jarvis_tokens`.
+Secrets live in `secrets/` (git-ignored) and are mounted as Docker secrets. Google OAuth tokens are stored
+(mode `0600`) in the `jarvis_tokens` volume.
 
-## Requisitos
+See [`docs/architecture.md`](docs/architecture.md) for the design and [`docs/PENDING.md`](docs/PENDING.md) for open work.
 
-- Docker y Docker Compose v2.
-- Una cuenta de Google (Gmail, Calendar, Tasks).
-- `openssl` (para generar secretos) y, para desarrollo, Node.js 22+ y pnpm.
-- Opcional: Claude Code (`claude`) y `npx` para MCP Inspector.
+## Requirements
+
+- Docker and Docker Compose v2.
+- A Google account (Gmail, Calendar, Tasks).
+- `openssl` (to generate secrets) and, for development, Node.js 22+ and pnpm.
+- Optional: Claude Code (`claude`) and `npx` for MCP Inspector.
 
 ## 1. Google Cloud Console
 
-1. Entra en <https://console.cloud.google.com/> y crea un proyecto (p. ej. `jarvis`).
-2. En *APIs y servicios > Biblioteca* habilita: **Gmail API**, **Google Calendar API** y **Google Tasks API**.
-3. En *APIs y servicios > Pantalla de consentimiento de OAuth* (o *Google Auth Platform*):
-   - Tipo de usuario: **Externo**.
-   - Agrega estos 4 scopes exactos (y ningún otro; nunca `https://mail.google.com/`):
+1. Go to <https://console.cloud.google.com/> and create a project (e.g. `jarvis`).
+2. Under *APIs & Services > Library* enable **Gmail API**, **Google Calendar API** and **Google Tasks API**.
+3. Under *APIs & Services > OAuth consent screen* (or *Google Auth Platform*):
+   - User type: **External**.
+   - Add exactly these 4 scopes (and no others; never `https://mail.google.com/`):
      - `https://www.googleapis.com/auth/gmail.readonly`
      - `https://www.googleapis.com/auth/gmail.compose`
      - `https://www.googleapis.com/auth/calendar.events`
      - `https://www.googleapis.com/auth/tasks`
-   - Agrega tu propio correo como **usuario de prueba**.
-4. **Publica la app a producción** (botón *Publicar aplicación*). Mientras la app está en modo *Testing*, Google hace
-   vencer el refresh token a los 7 días y tendrías que autorizar de nuevo cada semana. En producción no vence.
-   Como no pasarás la verificación de Google (es una app personal), al autorizar verás el aviso **"Google no ha
-   verificado esta aplicación"**: significa únicamente que Google no revisó la app porque tú mismo eres su autor y su
-   único usuario. Pulsa *Configuración avanzada > Ir a Jarvis (no seguro)* y acepta los permisos. Gmail
-   (`gmail.readonly`/`gmail.compose`) son scopes restringidos; el límite de 100 usuarios de apps sin verificar no te
-   afecta.
-5. En *Credenciales > Crear credenciales > ID de cliente de OAuth*, tipo **Aplicación de escritorio**. Descarga el
-   JSON y guárdalo como `secrets/google-oauth-client.json`.
+   - Add your own address as a **test user**.
+4. **Publish the app to production** (*Publish app* button). While the app is in *Testing* mode, Google expires the
+   refresh token after 7 days and you would have to re-authorize every week. In production it does not expire.
+   Since you will not go through Google verification (it is a personal app), when authorizing you will see the
+   **"Google hasn't verified this app"** warning: it only means Google has not reviewed the app because you are its
+   author and only user. Click *Advanced > Go to Jarvis (unsafe)* and accept the permissions. The Gmail scopes
+   (`gmail.readonly`/`gmail.compose`) are restricted; the 100-user limit for unverified apps does not affect you.
+5. Under *Credentials > Create credentials > OAuth client ID*, type **Desktop app**. Download the JSON and save it
+   as `secrets/google-oauth-client.json`.
 
-## 2. Secretos y configuración
+## 2. Secrets and configuration
 
 ```bash
 mkdir -p secrets
@@ -57,24 +58,24 @@ chmod 600 secrets/google-oauth-client.json
 cp jarvis.config.example.yaml jarvis.config.yaml
 ```
 
-Edita `jarvis.config.yaml` y declara tus cuentas (el `id` en minúsculas, único):
+Edit `jarvis.config.yaml` and declare your accounts (`id` lowercase and unique):
 
 ```yaml
 accounts:
   - id: personal
     provider: google
-    email: tu@correo.com
+    email: you@example.com
     calendars: [primary]
 ```
 
-Cualquier clave se puede sobrescribir por entorno con `JARVIS__SECCION__CLAVE`. Los archivos de `secrets/` nunca se
-commitean.
+Any key can be overridden from the environment with `JARVIS__SECTION__KEY`. Files in `secrets/` are never
+committed.
 
-## 3. Autorizar la cuenta de Google
+## 3. Authorize the Google account
 
-El flujo OAuth abre un servidor loopback en el puerto fijo `53682` (configurable con `JARVIS_OAUTH_PORT`; la
-dirección con `JARVIS_OAUTH_BIND`, por defecto `127.0.0.1`). Dentro de Docker debe escuchar en `0.0.0.0`, publicado
-sólo al loopback del host:
+The OAuth flow opens a loopback server on the fixed port `53682` (configurable with `JARVIS_OAUTH_PORT`; the
+address with `JARVIS_OAUTH_BIND`, default `127.0.0.1`). Inside Docker it must listen on `0.0.0.0`, published only
+to the host's loopback:
 
 ```bash
 docker compose up -d db
@@ -83,27 +84,27 @@ docker compose run --rm -p 127.0.0.1:53682:53682 -e JARVIS_OAUTH_BIND=0.0.0.0 \
   worker node dist/cli/jarvis.js auth --account personal
 ```
 
-Abre en el navegador la URL que imprime el comando, acepta los permisos y espera el mensaje de éxito. El token queda
-en el volumen `jarvis_tokens`. Repite con otro `--account <id>` por cada cuenta.
+Open the URL the command prints in your browser, accept the permissions and wait for the success message. The
+token is stored in the `jarvis_tokens` volume. Repeat with another `--account <id>` for each account.
 
-## 4. Levantar todo
+## 4. Start everything
 
 ```bash
 docker compose up -d --build
-docker compose ps          # db y mcp-server healthy; migrate "exited (0)"
+docker compose ps               # db and mcp-server healthy; migrate "exited (0)"
 curl -s 127.0.0.1:3002/health   # {"status":"ok"}
-docker compose logs -f worker   # debe mostrar un sync completo sin errores
+docker compose logs -f worker   # should show a full sync without errors
 ```
 
-Para forzar una sincronización puntual (desarrollo, con `DATABASE_URL` apuntando a la base):
+To force a one-off sync (development, with `DATABASE_URL` pointing at the database):
 
 ```bash
 pnpm jarvis sync --once
 ```
 
-o, en Docker: `docker compose run --rm worker node dist/cli/jarvis.js sync --once`.
+or, in Docker: `docker compose run --rm worker node dist/cli/jarvis.js sync --once`.
 
-## 5. Conectar Claude
+## 5. Connect Claude
 
 ### Claude Code
 
@@ -112,7 +113,7 @@ claude mcp add --transport http jarvis http://127.0.0.1:3002/mcp \
   --header "Authorization: Bearer $(cat secrets/mcp_token)"
 ```
 
-Dentro de Claude Code, `/mcp` debe listar `jarvis` como conectado.
+Inside Claude Code, `/mcp` should list `jarvis` as connected.
 
 ### MCP Inspector
 
@@ -120,35 +121,36 @@ Dentro de Claude Code, `/mcp` debe listar `jarvis` como conectado.
 npx @modelcontextprotocol/inspector
 ```
 
-Transporte **Streamable HTTP**, URL `http://127.0.0.1:3002/mcp`, y en *Authentication* el header `Authorization` con
-valor `Bearer <contenido de secrets/mcp_token>`. Prueba `get_daily_briefing`.
+Transport **Streamable HTTP**, URL `http://127.0.0.1:3002/mcp`, and under *Authentication* the `Authorization`
+header with value `Bearer <contents of secrets/mcp_token>`. Try `get_daily_briefing`.
 
-### Herramientas
+### Tools
 
 `get_daily_briefing`, `search_emails`, `read_thread`, `create_gmail_draft`, `list_events`, `find_free_slot`,
 `block_focus_time`, `list_tasks`, `create_task`, `complete_task`.
 
-## Desarrollo
+## Development
 
 ```bash
 pnpm install
-pnpm build        # compila todos los paquetes en orden topológico
+pnpm build        # builds every package in topological order
 pnpm test
-pnpm typecheck    # después de build
-pnpm lint:deps    # reglas de arquitectura (dependency-cruiser)
+pnpm typecheck    # after build
+pnpm lint:deps    # architecture rules (dependency-cruiser)
 ```
 
-## Solución de problemas
+## Troubleshooting
 
-- **`needs_reauth` en los logs o en el briefing:** el token de la cuenta fue revocado o venció. Repite el paso 3 para
-  esa cuenta (`auth --account <id>`).
-- **Puerto 53682 ocupado:** libera el puerto, o usa otro con `-e JARVIS_OAUTH_PORT=53700` y publica ese mismo puerto
-  (`-p 127.0.0.1:53700:53700`).
-- **El token vence a los 7 días:** la app sigue en modo *Testing*; publícala a producción (paso 1.4) y reautoriza.
-- **`mcp-server` no pasa a healthy:** revisa `docker compose logs mcp-server`; suele faltar `secrets/mcp_token` o
-  `jarvis.config.yaml`. Compose exige que existan los tres archivos de `secrets/` y el config antes de `up`.
-- **Permiso denegado leyendo secretos:** en hosts Linux donde tu usuario no es uid 1000, el usuario `node` del
-  contenedor no puede leer archivos `0600` ajenos; usa `chmod 644` en `secrets/*` (el directorio sigue siendo
-  git-ignorado) o ajusta el propietario.
-- **401 desde el cliente MCP:** el header debe ser `Authorization: Bearer <contenido exacto de secrets/mcp_token>`.
-- Los logs son JSON estructurado por stderr y nunca incluyen cuerpos de correo ni tokens.
+- **`needs_reauth` in the logs or the briefing:** the account's token was revoked or expired. Repeat step 3 for that
+  account (`auth --account <id>`).
+- **Port 53682 in use:** free the port, or use another one with `-e JARVIS_OAUTH_PORT=53700` and publish that same
+  port (`-p 127.0.0.1:53700:53700`).
+- **The token expires after 7 days:** the app is still in *Testing* mode; publish it to production (step 1.4) and
+  re-authorize.
+- **`mcp-server` never becomes healthy:** check `docker compose logs mcp-server`; usually `secrets/mcp_token` or
+  `jarvis.config.yaml` is missing. Compose requires the three `secrets/` files and the config to exist before `up`.
+- **Permission denied reading secrets:** on Linux hosts where your user is not uid 1000, the container's `node`
+  user cannot read someone else's `0600` files; use `chmod 644` on `secrets/*` (the directory stays git-ignored) or
+  change the owner.
+- **401 from the MCP client:** the header must be `Authorization: Bearer <exact contents of secrets/mcp_token>`.
+- Logs are structured JSON on stderr and never include email bodies or tokens.

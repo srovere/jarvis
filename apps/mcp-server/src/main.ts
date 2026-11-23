@@ -14,7 +14,7 @@ async function bootstrap(): Promise<void> {
     logger: new JsonLogger(stderrLogSink),
     abortOnError: false,
   });
-  // Cierra las sesiones MCP (McpSessions) y la base de datos al recibir SIGTERM/SIGINT.
+  // Close the MCP sessions (McpSessions) and the database on SIGTERM/SIGINT.
   app.enableShutdownHooks();
   await app.listen(config.mcp.port, config.mcp.bind);
 }

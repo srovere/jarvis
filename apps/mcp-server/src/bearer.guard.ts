@@ -12,9 +12,9 @@ export function readBearerToken(path: string): string {
     token = readFileSync(path, 'utf8').trim();
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    throw new Error(`No se pudo leer el token MCP en ${path} (mcp.tokenFile): ${reason}`);
+    throw new Error(`Could not read the MCP token at ${path} (mcp.tokenFile): ${reason}`);
   }
-  if (!token) throw new Error(`El archivo del token MCP ${path} (mcp.tokenFile) está vacío`);
+  if (!token) throw new Error(`MCP token file ${path} (mcp.tokenFile) is empty`);
   return token;
 }
 

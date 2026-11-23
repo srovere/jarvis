@@ -21,13 +21,13 @@ const LIST_HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date'];
 const SYNC_HEADERS = [...LIST_HEADERS, 'Message-ID', 'References'];
 const HISTORY_TYPES = ['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'];
 const FETCH_BATCH = 10;
-/** Mensajes con estas etiquetas no se sincronizan ni sirven de ancla para responder (DRAFT). */
+/** Messages with these labels are neither synced nor used as a reply anchor (DRAFT). */
 const EXCLUDED_LABELS = ['DRAFT', 'TRASH', 'SPAM'];
 const isExcluded = (m: { labels: string[] }): boolean => m.labels.some((l) => EXCLUDED_LABELS.includes(l));
 
 /**
- * Gmail como `MailReader`, `DraftWriter` e `IdentityProvider`.
- * Sólo crea borradores (`drafts.create`); nunca envía correo.
+ * Gmail as `MailReader`, `DraftWriter` and `IdentityProvider`.
+ * Only creates drafts (`drafts.create`); never sends email.
  */
 export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
   private readonly mapper: GmailMapper;
@@ -92,7 +92,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     return ref;
   }
 
-  // --- sincronización -------------------------------------------------------------------------
+  // --- sync -------------------------------------------------------------------------------------
 
   private async fullSync(windowDays: number): Promise<SyncResult<MailChange>> {
     const nextCursor = await this.currentHistoryId();
@@ -110,7 +110,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     return { changes, nextCursor, fullResync: true };
   }
 
-  /** `null` cuando Gmail ya no conserva el historial desde ese cursor (404). */
+  /** `null` when Gmail no longer keeps history since that cursor (404). */
   private async incrementalSync(cursor: string): Promise<SyncResult<MailChange> | null> {
     const latest = new Map<string, 'upsert' | 'delete'>();
     let nextCursor = cursor;
@@ -137,7 +137,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     return { changes, nextCursor, fullResync: false };
   }
 
-  /** El último evento de cada mensaje gana. */
+  /** The last event for each message wins. */
   private applyRecord(record: gmail_v1.Schema$History, latest: Map<string, 'upsert' | 'delete'>): void {
     const mark = (list: { message?: gmail_v1.Schema$Message }[] | undefined, kind: 'upsert' | 'delete'): void => {
       for (const { message } of list ?? []) if (message?.id) latest.set(message.id, kind);
@@ -148,7 +148,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     mark(record.messagesDeleted, 'delete');
   }
 
-  /** Descarga metadatos y produce upserts; los mensajes que ya no existen se omiten (o se vuelven delete si se pasa `deletes`). */
+  /** Fetches metadata and produces upserts; messages that no longer exist are skipped (or become deletes when `deletes` is given). */
   private async upserts(ids: string[], deletes?: MailChange[]): Promise<MailChange[]> {
     const fetched = await this.inBatches(ids, async (id) => ({ id, message: await this.fetchMessage(id) }));
     const out: MailChange[] = [];
@@ -166,7 +166,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     return profile.historyId;
   }
 
-  // --- acceso a la API ------------------------------------------------------------------------
+  // --- API access -----------------------------------------------------------------------------
 
   private async fetchMessage(id: string): Promise<gmail_v1.Schema$Message | null> {
     try {
@@ -185,7 +185,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     );
   }
 
-  /** Mensajes reales del hilo (sin borradores) en orden cronológico. */
+  /** Real thread messages (no drafts) in chronological order. */
   private async replyContext(threadId: string): Promise<MailMessage[]> {
     let thread: MailThread;
     try {
@@ -248,7 +248,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     const other = last.to.find((a) => !isOwn(a));
     if (other) return [other];
     const sender = [...messages].reverse().find((m) => !isOwn(m.from))?.from;
-    if (!sender) throw new DomainError('No hay destinatario para responder en este hilo');
+    if (!sender) throw new DomainError('No recipient to reply to in this thread');
     return [sender];
   }
 

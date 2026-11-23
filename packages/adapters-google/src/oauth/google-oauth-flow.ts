@@ -8,11 +8,11 @@ import { GOOGLE_SCOPES } from './scopes';
 import type { FileTokenStore } from './token-store';
 
 export interface GoogleOAuthFlowOptions {
-  /** Puerto del callback loopback (`JARVIS_OAUTH_PORT`, por defecto 53682). */
+  /** Loopback callback port (`JARVIS_OAUTH_PORT`, default 53682). */
   readonly port: number;
-  /** Host donde escucha el servidor (`JARVIS_OAUTH_BIND`, por defecto 127.0.0.1). */
+  /** Host the server listens on (`JARVIS_OAUTH_BIND`, default 127.0.0.1). */
   readonly bindHost: string;
-  /** Tiempo máximo de espera del callback. */
+  /** Maximum wait for the callback. */
   readonly timeoutMs: number;
 }
 
@@ -44,12 +44,12 @@ export class GoogleOAuthFlow {
     if (raw === undefined) return 53682;
     const port = Number(raw);
     if (raw.trim() === '' || !Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error(`JARVIS_OAUTH_PORT inválido: ${JSON.stringify(raw)} (debe ser un entero entre 1 y 65535)`);
+      throw new Error(`Invalid JARVIS_OAUTH_PORT: ${JSON.stringify(raw)} (must be an integer between 1 and 65535)`);
     }
     return port;
   }
 
-  /** Autoriza una cuenta vía loopback: imprime la URL en stderr, espera el callback y guarda el token. */
+  /** Authorizes an account via loopback: prints the URL to stderr, waits for the callback and stores the token. */
   async authorizeInteractive(accountId: string): Promise<void> {
     const secret = await this.readClientSecret();
     const state = randomBytes(16).toString('hex');
@@ -63,11 +63,11 @@ export class GoogleOAuthFlow {
         scope: [...GOOGLE_SCOPES],
         state,
       });
-      process.stderr.write(`Abrí esta URL en tu navegador para autorizar la cuenta ${accountId}:\n${url}\n`);
+      process.stderr.write(`Open this URL in your browser to authorize account ${accountId}:\n${url}\n`);
       const code = await codePromise;
       const { tokens } = await client.getToken(code);
       if (!tokens.refresh_token) {
-        throw new Error('Google no devolvió refresh_token; revocá el acceso de la app en tu cuenta y reintentá');
+        throw new Error("Google returned no refresh_token; revoke the app's access in your Google account and retry");
       }
       await this.store.write(accountId, tokens);
     } finally {
@@ -77,7 +77,7 @@ export class GoogleOAuthFlow {
     }
   }
 
-  /** Cliente OAuth2 con las credenciales guardadas; persiste los tokens refrescados. */
+  /** OAuth2 client with the stored credentials; persists refreshed tokens. */
   async client(accountId: string): Promise<OAuth2Client> {
     const stored = await this.store.read(accountId);
     if (!stored) throw new ReauthRequired(accountId);
@@ -88,7 +88,7 @@ export class GoogleOAuthFlow {
       const merged = { ...stored, ...fresh, refresh_token: fresh.refresh_token ?? stored.refresh_token };
       Object.assign(stored, merged);
       this.store.write(accountId, merged).catch((error: unknown) => {
-        process.stderr.write(`No se pudo guardar el token de ${accountId}: ${String(error)}\n`);
+        process.stderr.write(`Could not save the token for ${accountId}: ${String(error)}\n`);
       });
     });
     return client;
@@ -101,7 +101,7 @@ export class GoogleOAuthFlow {
     } & Partial<ClientSecret>;
     const secret = json.installed ?? json.web ?? (json as ClientSecret);
     if (!secret.client_id || !secret.client_secret) {
-      throw new Error(`Client secret inválido en ${this.clientSecretPath}`);
+      throw new Error(`Invalid client secret in ${this.clientSecretPath}`);
     }
     return secret;
   }
@@ -121,7 +121,7 @@ export class GoogleOAuthFlow {
       settle = { resolve, reject };
     });
     const timer = setTimeout(
-      () => settle.reject(new Error('Tiempo de espera agotado (5 minutos) esperando la autorización de Google')),
+      () => settle.reject(new Error('Timed out (5 minutes) waiting for Google authorization')),
       this.options.timeoutMs,
     );
     const server = createServer((req, res) => {
@@ -133,21 +133,21 @@ export class GoogleOAuthFlow {
       const code = url.searchParams.get('code');
       const error = url.searchParams.get('error');
       if (url.searchParams.get('state') !== state) {
-        res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' }).end('State inválido');
-        return; // no consume el intento: puede llegar el callback legítimo
+        res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' }).end('Invalid state');
+        return; // does not consume the attempt: the legitimate callback may still arrive
       }
       clearTimeout(timer);
       if (error || !code) {
-        res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' }).end('Autorización rechazada');
-        settle.reject(new Error(`Google rechazó la autorización: ${error ?? 'sin code'}`));
+        res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' }).end('Authorization denied');
+        settle.reject(new Error(`Google denied the authorization: ${error ?? 'no code'}`));
         return;
       }
       res
         .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-        .end('<!doctype html><meta charset="utf-8"><p>Listo, podés cerrar esta pestaña.</p>');
+        .end('<!doctype html><meta charset="utf-8"><p>Done, you can close this tab.</p>');
       settle.resolve(code);
     });
-    // El timer debe cancelarse también si el servidor no llega a iniciar (p. ej. EADDRINUSE).
+    // The timer must also be cleared if the server fails to start (e.g. EADDRINUSE).
     return { server, codePromise, cancelTimer: () => clearTimeout(timer) };
   }
 }

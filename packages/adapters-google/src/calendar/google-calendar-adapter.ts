@@ -6,13 +6,13 @@ import { callGoogle, isGone } from '../google-errors';
 import { CalendarMapper } from './calendar-mapper';
 
 /**
- * Ventana del resync completo. Debe coincidir con `CALENDAR_RESYNC_DAYS` de `SyncAccount` (core): esa
- * reconciliación borra los eventos guardados desde ahí que falten en el snapshot.
+ * Full-resync window. Must match `CALENDAR_RESYNC_DAYS` in `SyncAccount` (core): that reconciliation
+ * deletes stored events from that point on that are missing from the snapshot.
  */
 const INITIAL_WINDOW_DAYS = 30;
 const PAGE_SIZE = 250;
 
-/** Google Calendar como `CalendarReader` y `EventWriter`. */
+/** Google Calendar as `CalendarReader` and `EventWriter`. */
 export class GoogleCalendarAdapter implements CalendarReader, EventWriter {
   private readonly mapper: CalendarMapper;
 
@@ -99,7 +99,7 @@ export class GoogleCalendarAdapter implements CalendarReader, EventWriter {
     return this.collect(calendarId, { timeMin }, true);
   }
 
-  /** Recorre todas las páginas; `nextSyncToken` sólo llega en la última. */
+  /** Walks every page; `nextSyncToken` only arrives on the last one. */
   private async collect(
     calendarId: string,
     params: { syncToken?: string; timeMin?: string },

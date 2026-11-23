@@ -56,14 +56,14 @@ export class BriefingTools implements ToolGroup {
   }
 
   private summary(b: DailyBriefing): string {
-    const emails = b.priorityEmails.map((e) => `- ${dateTime(e.date)} De: ${e.from} — ${e.subject} [hilo ${e.threadId}]\n${e.snippet}`);
+    const emails = b.priorityEmails.map((e) => `- ${dateTime(e.date)} From: ${e.from} — ${e.subject} [thread ${e.threadId}]\n${e.snippet}`);
     return [
-      `Resumen del ${b.date}`,
-      section('Eventos', b.events.map((e) => eventLine(e, true)), 'eventos'),
-      section('Correos prioritarios', emails, 'correos prioritarios'),
-      section('Tareas que vencen', b.tasksDue.map(taskLine), 'tareas que vencen'),
+      `Briefing for ${b.date}`,
+      section('Events', b.events.map((e) => eventLine(e, true)), 'events'),
+      section('Priority emails', emails, 'priority emails'),
+      section('Tasks due', b.tasksDue.map(taskLine), 'tasks due'),
       ...(b.accountsNeedingReauth.length
-        ? [`Cuentas que requieren reautorización: ${b.accountsNeedingReauth.join(', ')}`]
+        ? [`Accounts that need re-authorization: ${b.accountsNeedingReauth.join(', ')}`]
         : []),
     ].join('\n');
   }

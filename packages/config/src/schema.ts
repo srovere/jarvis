@@ -13,7 +13,7 @@ const WorkScheduleSchema = z
       .refine((days) => new Set(days).size === days.length, { message: 'workDays must be unique' })
       .default([1, 2, 3, 4, 5]),
   })
-  // La ruta del issue ya queda en `workSchedule` por estar anidado en la raíz.
+  // The issue path already lands on `workSchedule` because it is nested under the root.
   .refine((s) => s.startHour < s.endHour, { message: 'startHour must be lower than endHour' });
 
 const FocusSchema = z.object({
@@ -45,11 +45,11 @@ const GoogleAccountSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/, 'id must match /^[a-z0-9][a-z0-9_-]*$/'),
   provider: z.literal('google'),
   email: z.string().email(),
-  /** Ids de calendarios que cuentan como ocupado; por defecto el principal. */
+  /** Ids of calendars that count as busy; defaults to the primary one. */
   calendars: z.array(z.string().min(1)).optional(),
 });
 
-// Para soportar otro proveedor, agregar su esquema a esta unión discriminada por `provider`.
+// To support another provider, add its schema to this union discriminated by `provider`.
 const AccountSchema = z.discriminatedUnion('provider', [GoogleAccountSchema]);
 
 export const JarvisConfigSchema = z.object({

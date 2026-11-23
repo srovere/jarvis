@@ -18,13 +18,13 @@ const msg = (id: string, from: string, to: string[], minutes: number): MailMessa
   from: addr(from),
   to: to.map(addr),
   cc: [],
-  subject: 'Hola',
+  subject: 'Hello',
   date: t0.plus({ minutes }),
   snippet: `snippet ${id}`,
   labels: [],
 });
 
-const thread = (messages: MailMessage[], subject = 'Hola'): MailThread => ({
+const thread = (messages: MailMessage[], subject = 'Hello'): MailThread => ({
   id: 't1',
   accountId: 'acc',
   subject,
@@ -65,15 +65,15 @@ describe('InMemoryMailProvider', () => {
     const p = provider(thread([msg('m1', 'a@y.com', ['me@x.com'], 0)]));
     const ref = await p.createDraft({ threadId: 't1', body: 'ok' });
     expect(ref.to.map((a) => a.address)).toEqual(['a@y.com']);
-    expect(ref.subject).toBe('Re: Hola');
+    expect(ref.subject).toBe('Re: Hello');
     expect(p.drafts).toHaveLength(1);
   });
 
   it('replies to the first non-own recipient when the last message is own, without duplicating Re:', async () => {
-    const p = provider(thread([msg('m1', 'me@x.com', ['me@x.com', 'b@y.com'], 0)], 're: Hola'));
+    const p = provider(thread([msg('m1', 'me@x.com', ['me@x.com', 'b@y.com'], 0)], 're: Hello'));
     const ref = await p.createDraft({ threadId: 't1', body: 'ok' });
     expect(ref.to.map((a) => a.address)).toEqual(['b@y.com']);
-    expect(ref.subject).toBe('re: Hola');
+    expect(ref.subject).toBe('re: Hello');
   });
 
   it('requires to or threadId', async () => {
@@ -82,7 +82,7 @@ describe('InMemoryMailProvider', () => {
 
   it('listThreads filters by substring, newest first', async () => {
     const p = provider(thread([msg('m1', 'a@y.com', ['me@x.com'], 0)]));
-    expect(await p.listThreads({ query: 'HOLA', maxResults: 5 })).toHaveLength(1);
+    expect(await p.listThreads({ query: 'HELLO', maxResults: 5 })).toHaveLength(1);
     expect(await p.listThreads({ query: 'nope', maxResults: 5 })).toHaveLength(0);
     expect(await p.listThreads({ query: '', maxResults: 5 })).toHaveLength(1);
   });

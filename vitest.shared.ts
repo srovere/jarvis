@@ -3,8 +3,8 @@ import { defineConfig } from 'vitest/config';
 
 const packages = resolve(__dirname, 'packages');
 
-// Los tests resuelven los paquetes del workspace (@jarvis/<pkg>[/subruta]) a su código fuente TypeScript,
-// sin depender de `dist` (que puede estar ausente o desactualizado).
+// Tests resolve workspace packages (@jarvis/<pkg>[/subpath]) to their TypeScript source,
+// without depending on `dist` (which may be missing or stale).
 export const sharedConfig = defineConfig({
   resolve: {
     alias: [

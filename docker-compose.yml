@@ -1,4 +1,4 @@
-# Despliegue local de Jarvis. Secretos en ./secrets (git-ignorado); ver README.md.
+# Local Jarvis deployment. Secrets live in ./secrets (git-ignored); see README.md.
 x-jarvis-env: &jarvis-env
   JARVIS_CONFIG: /app/jarvis.config.yaml
   PGPASSWORD_FILE: /run/secrets/pg_password
@@ -62,7 +62,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *jarvis-env
-      # Dentro del contenedor debe escuchar en todas las interfaces; el publicado al host es sólo 127.0.0.1.
+      # Inside the container it must listen on all interfaces; the port published to the host is 127.0.0.1 only.
       JARVIS__MCP__BIND: 0.0.0.0
     secrets: [pg_password, mcp_token]
     volumes:

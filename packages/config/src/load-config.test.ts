@@ -57,7 +57,7 @@ describe('loadConfig', () => {
   });
 
   it('rejects an unknown timezone', () => {
-    expect(() => loadConfig(write('timezone: Marte/Olimpo'), {})).toThrow(/invalid timezone/);
+    expect(() => loadConfig(write('timezone: Mars/Olympus'), {})).toThrow(/invalid timezone/);
   });
 
   it('accepts a valid IANA alias', () => {

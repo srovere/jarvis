@@ -40,7 +40,7 @@ export function requireDatabaseUrl(env: NodeJS.ProcessEnv): string {
     return `postgres://${user}:${password}@${host}:5432/${name}`;
   }
   throw new Error(
-    'Falta la variable de entorno DATABASE_URL (p. ej. postgres://usuario:clave@host:5432/jarvis), DATABASE_URL_FILE o PGPASSWORD_FILE',
+    'Missing environment variable DATABASE_URL (e.g. postgres://user:password@host:5432/jarvis), DATABASE_URL_FILE or PGPASSWORD_FILE',
   );
 }
 
@@ -49,8 +49,8 @@ function readSecret(variable: string, file: string): string {
   try {
     content = readFileSync(file, 'utf8').trim();
   } catch (e) {
-    throw new Error(`No se pudo leer el archivo de ${variable} (${file}): ${e instanceof Error ? e.message : String(e)}`);
+    throw new Error(`Could not read the ${variable} file (${file}): ${e instanceof Error ? e.message : String(e)}`);
   }
-  if (!content) throw new Error(`El archivo de ${variable} (${file}) está vacío`);
+  if (!content) throw new Error(`The ${variable} file (${file}) is empty`);
   return content;
 }

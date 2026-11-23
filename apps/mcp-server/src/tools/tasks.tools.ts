@@ -7,7 +7,7 @@ import { briefingTaskSchema } from './schemas';
 import type { ToolGroup } from './tool-group';
 import { ToolRunner } from './tool-runner';
 
-const STATUS_TITLES = { open: 'Tareas pendientes', completed: 'Tareas completadas', all: 'Tareas' } as const;
+const STATUS_TITLES = { open: 'Open tasks', completed: 'Completed tasks', all: 'Tasks' } as const;
 
 /** `list_tasks`, `create_task`, `complete_task`. */
 @Injectable()
@@ -41,7 +41,7 @@ export class TasksTools implements ToolGroup {
       ({ status }) =>
         this.runner.run('list_tasks', async () => {
           const tasks = await this.list.execute({ status });
-          return { text: section(STATUS_TITLES[status], tasks.map(taskLine), 'tareas'), structured: { tasks } };
+          return { text: section(STATUS_TITLES[status], tasks.map(taskLine), 'tasks'), structured: { tasks } };
         }),
     );
   }
@@ -68,7 +68,7 @@ export class TasksTools implements ToolGroup {
             ...(notes !== undefined ? { notes } : {}),
             ...(due !== undefined ? { due } : {}),
           });
-          return { text: `Tarea creada:\n${taskLine(task)}`, structured: task };
+          return { text: `Task created:\n${taskLine(task)}`, structured: task };
         }),
     );
   }
@@ -87,7 +87,7 @@ export class TasksTools implements ToolGroup {
       ({ task_id }) =>
         this.runner.run('complete_task', async () => {
           const task = await this.complete.execute({ taskId: task_id });
-          return { text: `Tarea completada:\n${taskLine(task)}`, structured: task };
+          return { text: `Task completed:\n${taskLine(task)}`, structured: task };
         }),
     );
   }
