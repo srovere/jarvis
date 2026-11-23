@@ -195,7 +195,21 @@ importers:
 
   packages/config: {}
 
-  packages/contracts: {}
+  packages/contracts:
+    dependencies:
+      '@jarvis/core':
+        specifier: workspace:*
+        version: link:../core
+      luxon:
+        specifier: ^3.7.2
+        version: 3.7.2
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@22.20.5)(supports-color@7.2.0)
+    devDependencies:
+      '@types/luxon':
+        specifier: ^3.7.6
+        version: 3.7.6
 
   packages/core:
     dependencies:
