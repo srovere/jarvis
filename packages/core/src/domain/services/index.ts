@@ -1,1 +1,1 @@
-export * from './email-cleaner';
+export * from "./email-cleaner";
