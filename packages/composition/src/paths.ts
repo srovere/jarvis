@@ -14,6 +14,11 @@ export function authPaths(config: JarvisConfig, configDir: string): AuthPaths {
   };
 }
 
+/** File holding the MCP bearer token; a relative `mcp.tokenFile` resolves against the configuration file's directory. */
+export function mcpTokenPath(config: JarvisConfig, configDir: string): string {
+  return resolve(configDir, config.mcp.tokenFile);
+}
+
 /** `DATABASE_URL` from the environment; a clear error when it is missing. */
 export function requireDatabaseUrl(env: NodeJS.ProcessEnv): string {
   const url = env.DATABASE_URL?.trim();

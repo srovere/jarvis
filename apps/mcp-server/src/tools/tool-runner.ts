@@ -1,0 +1,36 @@
+import { DomainError } from '@jarvis/core';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { Injectable, Logger } from '@nestjs/common';
+
+/** What a tool produces: a compact human-readable summary and the structured result. */
+export interface ToolOutput {
+  text: string;
+  structured: object;
+}
+
+const INTERNAL_ERROR = 'Error interno';
+
+/**
+ * Runs a tool body and shapes the MCP result. A `DomainError` becomes a tool error with its message; any other
+ * error becomes a generic "Error interno" (details go to the log, never to the client).
+ */
+@Injectable()
+export class ToolRunner {
+  private readonly logger = new Logger('McpTools');
+
+  async run(tool: string, body: () => Promise<ToolOutput>): Promise<CallToolResult> {
+    try {
+      const { text, structured } = await body();
+      return { content: [{ type: 'text', text }], structuredContent: structured as Record<string, unknown> };
+    } catch (e) {
+      if (e instanceof DomainError) return this.error(e.message);
+      const detail = e instanceof Error ? e.message : String(e);
+      this.logger.error(`La herramienta ${tool} falló: ${detail}`, e instanceof Error ? e.stack : undefined);
+      return this.error(INTERNAL_ERROR);
+    }
+  }
+
+  private error(text: string): CallToolResult {
+    return { isError: true, content: [{ type: 'text', text }] };
+  }
+}
