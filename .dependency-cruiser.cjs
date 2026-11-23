@@ -1,39 +1,51 @@
 /** Reglas de arquitectura hexagonal de Jarvis. */
-
+const LUXON = ['(^|/)node_modules/luxon/', '(^|/)node_modules/@types/luxon/', '^luxon$'];
+const ZOD = ['(^|/)node_modules/zod/', '^zod$'];
+const TESTS = '\\.test\\.ts$';
+// Los tests colocados pueden importar el runner.
+const VITEST = ['(^|/)node_modules/vitest/', '(^|/)node_modules/@vitest/', '^vitest(/|$)'];
+const ADAPTER_PKG = ['^packages/adapters-[^/]+/', '^@jarvis/adapters-', '(^|/)node_modules/@jarvis/adapters-'];
 
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
     {
       name: 'domain-pure',
-      comment: 'domain no importa nada fuera de sí mismo salvo luxon.',
+      comment: 'domain no importa nada fuera de sí mismo salvo luxon (los tests pueden importar vitest).',
       severity: 'error',
       from: { path: '^packages/core/src/domain/' },
-      to: {
-        pathNot: ['^packages/core/src/domain/', '^node_modules/luxon/', '^node_modules/@types/luxon/'],
-      },
+      to: { pathNot: ['^packages/core/src/domain/', ...LUXON, ...VITEST] },
     },
     {
       name: 'application-only-domain',
-      comment: 'application sólo importa domain/application (más luxon y zod).',
+      comment: 'application sólo importa domain/application (más luxon y zod; los tests pueden importar vitest).',
       severity: 'error',
       from: { path: '^packages/core/src/application/' },
       to: {
-        pathNot: [
-          '^packages/core/src/domain/',
-          '^packages/core/src/application/',
-          '^node_modules/luxon/',
-          '^node_modules/@types/luxon/',
-          '^node_modules/zod/',
-        ],
+        pathNot: ['^packages/core/src/domain/', '^packages/core/src/application/', ...LUXON, ...ZOD, ...VITEST],
       },
     },
     {
-      name: 'adapters-only-from-apps',
-      comment: 'Sólo apps/** puede importar @jarvis/adapters-*.',
+      name: 'adapters-only-from-composition-roots',
+      comment:
+        'Sólo las raíces de composición (apps/*/src/**/*.module.ts, apps/*/src/cli/**) y sus tests importan adaptadores; un adaptador puede importar su propio paquete.',
       severity: 'error',
-      from: { pathNot: '^apps/' },
-      to: { path: ['^packages/adapters-[^/]+/', '/@jarvis/adapters-[^/]+/'] },
+      from: {
+        pathNot: [
+          '^apps/[^/]+/src/.*\\.module\\.ts$',
+          '^apps/[^/]+/src/cli/',
+          '^apps/[^/]+/src/.*' + TESTS,
+          '^packages/(adapters-[^/]+)/', // se refina en la regla siguiente
+        ],
+      },
+      to: { path: ADAPTER_PKG },
+    },
+    {
+      name: 'adapters-no-cross-import',
+      comment: 'Un adaptador no importa a otro adaptador (sí a sí mismo).',
+      severity: 'error',
+      from: { path: '^packages/(adapters-[^/]+)/' },
+      to: { path: ADAPTER_PKG, pathNot: '^packages/$1/' },
     },
     {
       name: 'adapters-not-apps',
