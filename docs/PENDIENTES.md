@@ -1,6 +1,6 @@
 # Jarvis — Pendientes
 
-Estado al 2026-11-23. Rama: `feat/jarvis-fase1`.
+Estado al 2026-11-23. Mergeado a `main` (rama `feat/jarvis-fase1`).
 
 ## Dónde estamos
 
@@ -23,7 +23,7 @@ Arquitectura: [`architecture.md`](architecture.md) · Instalación: [`../README.
 2. **Verificación real con la cuenta de Google** siguiendo el README: proyecto en Google Cloud,
    secretos, `jarvis.config.yaml`, `docker compose run … auth`, `docker compose up -d`,
    `claude mcp add …`. Crear un borrador y un evento de prueba sólo con confirmación explícita.
-3. **Merge de `feat/jarvis-fase1` a `main`** (vía PR).
+3. ~~Merge de `feat/jarvis-fase1` a `main`~~ — hecho el 2026-11-23 (sin la revisión final; hacerla sobre `main`).
 4. **Documentación** (ver sección siguiente).
 5. Fases siguientes del diseño: 2 Proyectos (local/SSH, descubrimiento, personas, espejo de tareas) ·
    3 Agente (Claude Code, highlights, resúmenes de reunión, aprobación de acciones) ·
