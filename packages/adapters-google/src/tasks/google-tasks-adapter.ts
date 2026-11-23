@@ -35,13 +35,17 @@ export class GoogleTasksAdapter implements TaskReader, TaskWriter {
     });
   }
 
-  /** Cursor = `updated` máximo visto (no "ahora") para no depender del reloj local. */
+  /**
+   * Cursor sin pérdidas: `<iso>|<id1,id2,...>` con el `updated` máximo visto y los ids de las tareas
+   * con ese instante. `updatedMin` es inclusivo (resolución de ms), así que sólo se omiten las ya vistas
+   * en ese instante; una tarea nueva con el mismo `updated` se entrega igual.
+   */
   async sync(listId: string, cursor: string | null): Promise<SyncResult<TaskChange>> {
-    const since = cursor ?? EPOCH;
-    const sinceMs = Date.parse(since);
+    const parsed = this.parseCursor(cursor);
     const changes: TaskChange[] = [];
-    let maxUpdated = since;
-    let maxMs = sinceMs;
+    let maxMs = parsed.ms;
+    let maxIso = parsed.iso;
+    let atMax = new Set(parsed.seen);
     let pageToken: string | undefined;
     do {
       const token = pageToken;
@@ -53,24 +57,31 @@ export class GoogleTasksAdapter implements TaskReader, TaskWriter {
           showDeleted: true,
           maxResults: PAGE_SIZE,
           pageToken: token,
-          ...(cursor !== null && { updatedMin: cursor }),
+          ...(cursor !== null && { updatedMin: parsed.iso }),
         }),
       );
       for (const t of page.items ?? []) {
         const task = this.mapper.toTask(t, listId);
         if (!task) continue;
         const ms = task.updatedAt.toMillis();
-        // `updatedMin` es inclusivo: descarta lo ya visto en el cursor.
-        if (cursor !== null && ms <= sinceMs) continue;
+        if (cursor !== null && (ms < parsed.ms || (ms === parsed.ms && parsed.seen.has(task.id)))) continue;
         if (ms > maxMs) {
           maxMs = ms;
-          maxUpdated = task.updatedAt.toUTC().toISO()!;
+          maxIso = task.updatedAt.toUTC().toISO()!;
+          atMax = new Set();
         }
+        if (ms === maxMs) atMax.add(task.id);
         changes.push(task.deleted ? { kind: 'delete', taskId: task.id } : { kind: 'upsert', task });
       }
       pageToken = page.nextPageToken ?? undefined;
     } while (pageToken);
-    return { changes, nextCursor: maxUpdated, fullResync: cursor === null };
+    return { changes, nextCursor: `${maxIso}|${[...atMax].join(',')}`, fullResync: cursor === null };
+  }
+
+  /** Acepta también el formato antiguo (ISO sin `|`) como conjunto de ids vacío. */
+  private parseCursor(cursor: string | null): { iso: string; ms: number; seen: Set<string> } {
+    const [iso = EPOCH, ids = ''] = (cursor ?? EPOCH).split('|');
+    return { iso, ms: Date.parse(iso), seen: new Set(ids.split(',').filter(Boolean)) };
   }
 
   async createTask(listId: string, t: { title: string; notes?: string; due?: DateTime }): Promise<Task> {

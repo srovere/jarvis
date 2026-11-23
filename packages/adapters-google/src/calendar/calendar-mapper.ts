@@ -41,17 +41,22 @@ export class CalendarMapper {
 
   private toRange(e: calendar_v3.Schema$Event): { range: TimeRange; allDay: boolean } | null {
     const { start, end } = e;
-    if (start?.date && end?.date) {
+    if (start?.date) {
       const s = DateTime.fromISO(start.date, { zone: this.zone }).startOf('day');
-      const f = DateTime.fromISO(end.date, { zone: this.zone }).startOf('day');
-      return s.isValid && f.isValid ? { range: new TimeRange(s, f), allDay: true } : null;
+      const f = end?.date ? DateTime.fromISO(end.date, { zone: this.zone }).startOf('day') : s.plus({ days: 1 });
+      return s.isValid && f.isValid ? { range: this.safeRange(s, f), allDay: true } : null;
     }
     if (start?.dateTime && end?.dateTime) {
       const s = DateTime.fromISO(start.dateTime, { zone: this.zone });
       const f = DateTime.fromISO(end.dateTime, { zone: this.zone });
-      return s.isValid && f.isValid ? { range: new TimeRange(s, f), allDay: false } : null;
+      return s.isValid && f.isValid ? { range: this.safeRange(s, f), allDay: false } : null;
     }
     return null;
+  }
+
+  /** Eventos de duración cero o negativa se ensanchan a 1 minuto: siguen visibles y no abortan la lectura. */
+  private safeRange(s: DateTime, f: DateTime): TimeRange {
+    return new TimeRange(s, f > s ? f : s.plus({ minutes: 1 }));
   }
 
   private toStatus(status: string | null | undefined): CalendarEvent['status'] {

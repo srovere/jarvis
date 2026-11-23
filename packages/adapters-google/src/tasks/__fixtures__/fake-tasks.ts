@@ -69,7 +69,7 @@ export class FakeTasks {
 
   seed(listId: string, task: Task): string {
     const id = task.id ?? `task${this.nextId++}`;
-    this.tasks.get(listId)?.set(id, { status: 'needsAction', ...task, id, updated: this.stamp() });
+    this.tasks.get(listId)?.set(id, { status: 'needsAction', ...task, id, updated: task.updated ?? this.stamp() });
     return id;
   }
 

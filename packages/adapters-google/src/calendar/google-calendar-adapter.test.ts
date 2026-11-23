@@ -67,7 +67,37 @@ describe('GoogleCalendarAdapter mapping', () => {
   });
 });
 
+describe('GoogleCalendarAdapter robustness', () => {
+  it('widens zero-length and negative events to one minute instead of aborting', async () => {
+    const { fake, adapter } = setup();
+    fake.seed('primary', { id: 'z', start: { dateTime: '2026-11-24T10:00:00-03:00' }, end: { dateTime: '2026-11-24T10:00:00-03:00' } });
+    fake.seed('primary', { id: 'n', start: { dateTime: '2026-11-24T12:00:00-03:00' }, end: { dateTime: '2026-11-24T11:00:00-03:00' } });
+    const events = await adapter.listEvents(day, ['primary']);
+    expect(events.map((e) => [e.id, e.range.durationMinutes()]).sort()).toEqual([['n', 1], ['z', 1]]);
+    expect((await adapter.sync('primary', null)).changes).toHaveLength(2);
+  });
+
+  it('an all-day event without end.date lasts one day', async () => {
+    const { fake, adapter } = setup();
+    fake.seed('primary', { id: 'd', start: { date: '2026-11-24' } });
+    const [e] = await adapter.listEvents(day, ['primary']);
+    expect(e!.allDay).toBe(true);
+    expect(e!.range.end.toISO()).toBe('2026-11-25T00:00:00.000-03:00');
+  });
+});
+
 describe('GoogleCalendarAdapter sync', () => {
+  it('incremental sync follows pages and returns every change', async () => {
+    const { fake, adapter } = setup({ pageSize: 1 });
+    const first = await adapter.sync('primary', null);
+    for (const id of ['a', 'b', 'c']) {
+      fake.seed('primary', { id, start: { dateTime: '2026-11-24T10:00:00-03:00' }, end: { dateTime: '2026-11-24T11:00:00-03:00' } });
+    }
+    const next = await adapter.sync('primary', first.nextCursor);
+    expect(next.fullResync).toBe(false);
+    expect(next.changes).toHaveLength(3);
+  });
+
   it('full sync uses singleEvents, showDeleted and timeMin = now - 30 days, across pages', async () => {
     const { fake, adapter } = setup({ pageSize: 1 });
     for (const id of ['a', 'b', 'c']) {

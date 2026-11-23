@@ -44,7 +44,7 @@ describe('GoogleTasksAdapter', () => {
     const r = await adapter.sync(list!.id, null);
     expect(fake.calls.tasksList.mock.calls[0]![0]).toMatchObject({ showCompleted: true, showHidden: true, showDeleted: true });
     expect(r.changes).toHaveLength(2);
-    expect(DateTime.fromISO(r.nextCursor).toMillis()).toBe(bUpdated.toMillis());
+    expect(DateTime.fromISO(r.nextCursor.split('|')[0]!).toMillis()).toBe(bUpdated.toMillis());
   });
 
   it('a deleted task becomes a delete change and incremental sync passes updatedMin', async () => {
@@ -56,7 +56,7 @@ describe('GoogleTasksAdapter', () => {
     const next = await adapter.sync(list!.id, first.nextCursor);
     expect(next.changes).toEqual([{ kind: 'delete', taskId: 't1' }]);
     expect(next.fullResync).toBe(false);
-    expect(fake.calls.tasksList.mock.calls.at(-1)![0].updatedMin).toBe(first.nextCursor);
+    expect(fake.calls.tasksList.mock.calls.at(-1)![0].updatedMin).toBe(first.nextCursor.split('|')[0]);
   });
 
   it('createTask sends due as RFC3339 midnight UTC of the given date', async () => {
@@ -79,5 +79,27 @@ describe('GoogleTasksAdapter', () => {
     expect(fake.calls.tasksPatch).toHaveBeenCalledWith({ tasklist: list!.id, task: t.id, requestBody: { status: 'completed' } });
     expect(done.status).toBe('completed');
     expect(done.completedAt).toBeDefined();
+  });
+
+  it('redelivers a task updated at exactly the cursor millisecond (lossless cursor)', async () => {
+    const { fake, adapter } = setup();
+    const [list] = await adapter.listLists();
+    const T = '2026-11-23T10:00:00.000Z';
+    fake.seed(list!.id, { id: 'A', title: 'A', updated: T });
+    const first = await adapter.sync(list!.id, null);
+    expect((await adapter.sync(list!.id, first.nextCursor)).changes).toEqual([]);
+    fake.seed(list!.id, { id: 'B', title: 'B', updated: T });
+    const next = await adapter.sync(list!.id, first.nextCursor);
+    expect(next.changes.map((c) => (c.kind === 'upsert' ? c.task.id : c.taskId))).toEqual(['B']);
+    const again = await adapter.sync(list!.id, next.nextCursor);
+    expect(again.changes).toEqual([]);
+  });
+
+  it('accepts a legacy plain-ISO cursor', async () => {
+    const { fake, adapter } = setup();
+    const [list] = await adapter.listLists();
+    fake.seed(list!.id, { id: 'A', title: 'A', updated: '2026-11-23T10:00:00.000Z' });
+    const r = await adapter.sync(list!.id, '2026-11-23T09:00:00.000Z');
+    expect(r.changes).toHaveLength(1);
   });
 });
