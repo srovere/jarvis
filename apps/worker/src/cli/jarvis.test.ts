@@ -55,7 +55,7 @@ describe('jarvis auth', () => {
     const { run, out, authorize } = setup();
     await run('auth', '--account', 'personal');
     expect(authorize).toHaveBeenCalledWith('personal');
-    expect(out).toEqual(['Token guardado para personal']);
+    expect(out).toEqual(['Token saved for personal']);
   });
 
   it('exits 1 listing configured ids for an unknown account', async () => {
@@ -63,7 +63,7 @@ describe('jarvis auth', () => {
     await expect(run('auth', '--account', 'nope')).rejects.toMatchObject({ code: 1 });
     expect(authorize).not.toHaveBeenCalled();
     expect(err).toEqual([
-      'La cuenta "nope" no existe en la configuración. Cuentas configuradas: personal, work',
+      'Account "nope" is not in the config. Configured accounts: personal, work',
     ]);
   });
 
@@ -159,9 +159,9 @@ describe('jarvis sync --once', () => {
 
   it('reports a run failure on stderr, closes the context and exits 1', async () => {
     const { run, err, session } = setup();
-    session.run.mockRejectedValue(new Error('Cuenta no activa: nope'));
+    session.run.mockRejectedValue(new Error('Account not active: nope'));
     await expect(run('sync', '--once', '--account', 'nope')).rejects.toMatchObject({ code: 1 });
-    expect(err).toEqual(['Cuenta no activa: nope']);
+    expect(err).toEqual(['Account not active: nope']);
     expect(session.close).toHaveBeenCalled();
   });
 

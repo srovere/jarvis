@@ -11,10 +11,10 @@ export async function selectAccount(accounts: AccountRepository, accountId?: str
   const active = await activeAccounts(accounts);
   if (accountId !== undefined) {
     const found = active.find((a) => a.id === accountId);
-    if (!found) throw new DomainError(`Cuenta no activa: ${accountId}`);
+    if (!found) throw new DomainError(`Account not active: ${accountId}`);
     return found;
   }
   const first = active[0];
-  if (!first) throw new DomainError('No hay cuentas activas');
+  if (!first) throw new DomainError('No active accounts');
   return first;
 }

@@ -14,18 +14,18 @@ interface HistoryRecord {
 }
 
 export interface FakeGmailOptions {
-  /** Direcciones sendAs; la primera es la primaria. */
+  /** sendAs addresses; the first is the primary one. */
   sendAs?: string[];
-  /** Reloj para `newer_than:`; por defecto `Date.now`. */
+  /** Clock for `newer_than:`; defaults to `Date.now`. */
   now?: () => number;
-  /** Tamaño de página de `messages.list` y `history.list` (para ejercitar la paginación). */
+  /** Page size of `messages.list` and `history.list` (to exercise pagination). */
   pageSize?: number;
 }
 
 const b64 = (s: string): string => Buffer.from(s, 'utf8').toString('base64url');
 const apiError = (code: number): Error & { code: number } => Object.assign(new Error(`HTTP ${code}`), { code });
 
-/** Gmail en memoria: implementa el subconjunto de `gmail_v1.Gmail` que usa `GmailAdapter`. */
+/** In-memory Gmail: implements the subset of `gmail_v1.Gmail` that `GmailAdapter` uses. */
 export class FakeGmail {
   readonly sendSpy = vi.fn();
   readonly draftSendSpy = vi.fn();
@@ -55,7 +55,7 @@ export class FakeGmail {
     this.sendAs = opts.sendAs ?? ['me@x.com'];
   }
 
-  /** Cliente tipado para inyectar en el adaptador. */
+  /** Typed client to inject into the adapter. */
   asGmail(): gmail_v1.Gmail {
     return this.client as unknown as gmail_v1.Gmail;
   }
@@ -77,7 +77,7 @@ export class FakeGmail {
     this.record({ deleted: [id] });
   }
 
-  /** Borra un mensaje sin dejar rastro en el historial (Gmail lo expulsó entre el evento y la lectura). */
+  /** Deletes a message without a history trace (Gmail purged it between the event and the read). */
   dropMessageSilently(id: string): void {
     this.messages.delete(id);
   }
@@ -92,7 +92,7 @@ export class FakeGmail {
     });
   }
 
-  /** Simula que Gmail ya no conserva el historial anterior al actual (404 en `history.list`). */
+  /** Simulates Gmail no longer keeping history before now (404 on `history.list`). */
   expireHistory(): void {
     this.oldestHistoryId = this.historyId;
   }
@@ -194,7 +194,7 @@ export class FakeGmail {
 
   // --- internos --------------------------------------------------------------------------------
 
-  /** Un borrador aparece en `threads.get` como un mensaje más, con la etiqueta DRAFT. */
+  /** A draft shows up in `threads.get` as one more message, labelled DRAFT. */
   private draftMessage(id: string, threadId: string, mime: string): Message {
     const [head = ''] = mime.split('\r\n\r\n');
     const headers: Header[] = head
@@ -239,7 +239,7 @@ export class FakeGmail {
     return `${subject} ${m.snippet ?? ''}`.toLowerCase();
   }
 
-  /** `metadata` conserva sólo los headers pedidos y sin cuerpo; `full` devuelve todo. */
+  /** `metadata` keeps only the requested headers and no body; `full` returns everything. */
   private shape(m: Message, format?: string, only?: string[]): Message {
     if (format !== 'metadata') return m;
     const wanted = only?.map((h) => h.toLowerCase());

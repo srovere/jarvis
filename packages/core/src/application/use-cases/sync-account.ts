@@ -69,7 +69,7 @@ export class SyncAccount {
       }
     } catch (e) {
       if (!(e instanceof ReauthRequired)) throw e;
-      await this.accounts.setStatus(accountId, 'needs_reauth', `ejecutá pnpm jarvis auth --account ${accountId}`);
+      await this.accounts.setStatus(accountId, 'needs_reauth', `run pnpm jarvis auth --account ${accountId}`);
     }
     return result;
   }

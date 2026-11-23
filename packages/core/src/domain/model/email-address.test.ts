@@ -14,7 +14,7 @@ describe('EmailAddress', () => {
     expect(EmailAddress.parse('Bob <b@b.co>').name).toBe('Bob');
   });
   it('rejects invalid input', () => {
-    expect(() => EmailAddress.parse('no-es-mail')).toThrow(InvalidEmailAddress);
+    expect(() => EmailAddress.parse('not-an-email')).toThrow(InvalidEmailAddress);
   });
   it('equals compares addresses only', () => {
     expect(EmailAddress.parse('A@b.co').equals(EmailAddress.parse('X <a@b.co>'))).toBe(true);

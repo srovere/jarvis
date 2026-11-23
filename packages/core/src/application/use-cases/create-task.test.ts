@@ -32,6 +32,6 @@ describe('CreateTask', () => {
   });
 
   it('rejects malformed dates', async () => {
-    await expect(uc.execute({ title: 'T', due: '24/11/2026' })).rejects.toThrow('Fecha inválida: 24/11/2026');
+    await expect(uc.execute({ title: 'T', due: '24/11/2026' })).rejects.toThrow('Invalid date: 24/11/2026');
   });
 });

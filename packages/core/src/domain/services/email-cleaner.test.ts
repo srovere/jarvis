@@ -78,7 +78,7 @@ describe("EmailCleaner", () => {
   it("truncates long input with marker", () => {
     const out = cleaner().clean({ bodyText: "a".repeat(10000), snippet });
     expect(out.length).toBeLessThanOrEqual(4040);
-    expect(out.endsWith("\n[… truncado, 10000 caracteres en total]")).toBe(
+    expect(out.endsWith("\n[… truncated, 10000 chars total]")).toBe(
       true,
     );
   });
@@ -86,7 +86,7 @@ describe("EmailCleaner", () => {
   it("handles HTML-only huge Spanish quoted message", () => {
     const html = `<p>${"x".repeat(5000)}</p>\nEl lun, 3 nov 2026, Ana ana@x.com\nescribió:\n${"y".repeat(9000)}`;
     const out = cleaner().clean({ bodyHtml: html, snippet });
-    expect(out).toContain("[… truncado, 5000 caracteres en total]");
+    expect(out).toContain("[… truncated, 5000 chars total]");
     expect(out).not.toContain("y");
   });
 
@@ -111,9 +111,9 @@ describe("EmailCleaner", () => {
     expect(
       cleaner().clean({
         bodyText: "> a\n> b\n-- \nSanti",
-        snippet: "Hola &amp; chau",
+        snippet: "Hi &amp; bye",
       }),
-    ).toBe("Hola & chau");
+    ).toBe("Hi & bye");
   });
 
   it("decodes hex entities and nbsp, ignores invalid code points", () => {

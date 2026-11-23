@@ -1,9 +1,9 @@
-/** Reglas de arquitectura hexagonal de Jarvis. */
+/** Jarvis's hexagonal architecture rules. */
 const LUXON = ['(^|/)node_modules/luxon/', '(^|/)node_modules/@types/luxon/', '^luxon$'];
 const ZOD = ['(^|/)node_modules/zod/', '^zod$'];
 const TESTS = '\\.test\\.ts$';
 const TEST_FILES = '\\.test(-support)?\\.ts$';
-// Los tests colocados pueden importar el runner.
+// Co-located tests may import the runner.
 const VITEST = ['(^|/)node_modules/vitest/', '(^|/)node_modules/@vitest/', '^vitest(/|$)'];
 const ADAPTER_PKG = ['^packages/adapters-[^/]+/', '^@jarvis/adapters-', '(^|/)node_modules/@jarvis/adapters-'];
 
@@ -12,14 +12,14 @@ module.exports = {
   forbidden: [
     {
       name: 'domain-pure',
-      comment: 'domain no importa nada fuera de sí mismo salvo luxon (los tests pueden importar vitest).',
+      comment: 'domain imports nothing outside itself except luxon (tests may import vitest).',
       severity: 'error',
       from: { path: '^packages/core/src/domain/' },
       to: { pathNot: ['^packages/core/src/domain/', ...LUXON, ...VITEST] },
     },
     {
       name: 'application-only-domain',
-      comment: 'application sólo importa domain/application (más luxon y zod).',
+      comment: 'application only imports domain/application (plus luxon and zod).',
       severity: 'error',
       from: { path: '^packages/core/src/application/', pathNot: TEST_FILES },
       to: {
@@ -28,7 +28,7 @@ module.exports = {
     },
     {
       name: 'application-tests-only-domain-and-doubles',
-      comment: 'Los tests de application (y sus *.test-support.ts) además pueden importar vitest y los dobles de core/testing.',
+      comment: 'application tests (and their *.test-support.ts) may also import vitest and the core/testing doubles.',
       severity: 'error',
       from: { path: '^packages/core/src/application/.*' + TEST_FILES },
       to: {
@@ -45,7 +45,7 @@ module.exports = {
     {
       name: 'adapters-only-from-composition-roots',
       comment:
-        'Sólo las raíces de composición (packages/composition, apps/*/src/**/*.module.ts, apps/*/src/cli/**) y sus tests importan adaptadores; un adaptador puede importar su propio paquete.',
+        'Only composition roots (packages/composition, apps/*/src/**/*.module.ts, apps/*/src/cli/**) and their tests import adapters; an adapter may import its own package.',
       severity: 'error',
       from: {
         pathNot: [
@@ -53,28 +53,28 @@ module.exports = {
           '^apps/[^/]+/src/.*\\.module\\.ts$',
           '^apps/[^/]+/src/cli/',
           '^apps/[^/]+/src/.*' + TESTS,
-          '^packages/(adapters-[^/]+)/', // se refina en la regla siguiente
+          '^packages/(adapters-[^/]+)/', // refined by the next rule
         ],
       },
       to: { path: ADAPTER_PKG },
     },
     {
       name: 'adapters-no-cross-import',
-      comment: 'Un adaptador no importa a otro adaptador (sí a sí mismo).',
+      comment: 'An adapter does not import another adapter (itself is fine).',
       severity: 'error',
       from: { path: '^packages/(adapters-[^/]+)/' },
       to: { path: ADAPTER_PKG, pathNot: '^packages/$1/' },
     },
     {
       name: 'composition-only-from-apps',
-      comment: 'La raíz de composición compartida (packages/composition) sólo la importan las apps.',
+      comment: 'The shared composition root (packages/composition) is only imported by apps.',
       severity: 'error',
       from: { path: '^packages/', pathNot: '^packages/composition/' },
       to: { path: ['^packages/composition/', '^@jarvis/composition', '(^|/)node_modules/@jarvis/composition'] },
     },
     {
       name: 'adapters-not-apps',
-      comment: 'Los adaptadores no importan apps.',
+      comment: 'Adapters do not import apps.',
       severity: 'error',
       from: { path: '^packages/adapters-' },
       to: { path: '^apps/' },

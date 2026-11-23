@@ -1,42 +1,42 @@
-# Arquitectura de Jarvis
+# Jarvis Architecture
 
-> Documento vivo. Describe **cómo está construido** Jarvis. El **por qué** y las decisiones de alcance están en
+> Living document. It describes **how Jarvis is built**. The **why** and the scope decisions are in
 > [`superpowers/specs/2026-11-23-jarvis-design.md`](superpowers/specs/2026-11-23-jarvis-design.md).
 
-## 1. Vista de contexto
+## 1. Context view
 
-Jarvis es un asistente personal que corre localmente en Docker. Integra proveedores de correo, calendario y tareas, lee el estado de proyectos de desarrollo en varios servidores y usa un agente de IA (Claude Code, con la suscripción del usuario) para resumir, responder preguntas y proponer acciones.
+Jarvis is a personal assistant that runs locally in Docker. It integrates email, calendar and task providers, reads the state of development projects on several servers and uses an AI agent (Claude Code, with the user's subscription) to summarize, answer questions and propose actions.
 
 ```mermaid
 flowchart LR
-  U((Santiago))
-  subgraph Host["Máquina de Jarvis (Docker Compose)"]
+  U((User))
+  subgraph Host["Jarvis host (Docker Compose)"]
     J[Jarvis]
   end
-  CC[Claude Code<br/>en la terminal]
+  CC[Claude Code<br/>in the terminal]
   G[(Google<br/>Gmail · Calendar · Tasks)]
-  MS[(Microsoft 365<br/>futuro)]
-  S1[[Servidor dev 1<br/>repos + ~/.claude]]
-  S2[[Servidor dev N]]
-  L[[Carpetas locales<br/>repos + ~/.claude]]
-  AI[Claude<br/>suscripción]
+  MS[(Microsoft 365<br/>future)]
+  S1[[Dev server 1<br/>repos + ~/.claude]]
+  S2[[Dev server N]]
+  L[[Local folders<br/>repos + ~/.claude]]
+  AI[Claude<br/>subscription]
 
-  U -- navegador --> J
-  U -- usa --> CC
+  U -- browser --> J
+  U -- uses --> CC
   CC -- MCP --> J
   J -- OAuth/REST --> G
-  J -. futuro .-> MS
-  J -- SSH acotado --> S1
-  J -- SSH acotado --> S2
-  J -- volúmenes --> L
+  J -. future .-> MS
+  J -- restricted SSH --> S1
+  J -- restricted SSH --> S2
+  J -- volumes --> L
   J -- claude -p --> AI
 ```
 
-## 2. Contenedores (Docker Compose)
+## 2. Containers (Docker Compose)
 
 ```mermaid
 flowchart TB
-  subgraph compose["docker compose (puertos sólo en 127.0.0.1)"]
+  subgraph compose["docker compose (ports on 127.0.0.1 only)"]
     web["web<br/>React + Vite (nginx)"]
     api["api<br/>NestJS"]
     mcp["mcp-server<br/>NestJS + MCP SDK<br/>Streamable HTTP"]
@@ -44,44 +44,44 @@ flowchart TB
     db[("db<br/>PostgreSQL 17")]
   end
   web -- REST / SSE --> api
-  api -- cliente MCP --> mcp
+  api -- MCP client --> mcp
   api -- spawn --> cli1["claude -p<br/>(chat)"]
-  cli1 -- cliente MCP --> mcp
-  worker -- spawn --> cli2["claude -p<br/>(resúmenes)"]
+  cli1 -- MCP client --> mcp
+  worker -- spawn --> cli2["claude -p<br/>(summaries)"]
   mcp --> core
   api --> core
   worker --> core
-  core["packages/core<br/>(dominio + adaptadores)"] --> db
+  core["packages/core<br/>(domain + adapters)"] --> db
 ```
 
-| Contenedor | Rol | Expone |
+| Container | Role | Exposes |
 |---|---|---|
-| `web` | Dashboard React. Sin lógica de negocio. | `127.0.0.1:3000` |
-| `api` | Backend del dashboard: lectura/escritura vía **cliente MCP**, endpoints de administración (registro, vinculación, aprobaciones), orquestación del chat (`AgentRunner`), streaming SSE. | `127.0.0.1:3001` |
-| `mcp-server` | **Única puerta de los agentes** a los datos y acciones. Herramientas del dominio sobre `core`. | `127.0.0.1:3002` (token bearer) |
-| `worker` | Jobs: sincronización, descubrimiento de proyectos, snapshots, espejo de tareas, cola de IA. | — |
-| `db` | Persistencia. | sólo red interna |
+| `web` | React dashboard. No business logic. | `127.0.0.1:3000` |
+| `api` | Dashboard backend: reads/writes through an **MCP client**, admin endpoints (registry, linking, approvals), chat orchestration (`AgentRunner`), SSE streaming. | `127.0.0.1:3001` |
+| `mcp-server` | **The agents' only gateway** to data and actions. Domain tools on top of `core`. | `127.0.0.1:3002` (bearer token) |
+| `worker` | Jobs: sync, project discovery, snapshots, task mirror, AI queue. | — |
+| `db` | Persistence. | internal network only |
 
-`api` y `worker` incluyen el CLI de Claude Code; el token de suscripción llega como Docker secret.
+`api` and `worker` ship the Claude Code CLI; the subscription token arrives as a Docker secret.
 
-## 3. Capas y dependencias (puertos y adaptadores)
+## 3. Layers and dependencies (ports and adapters)
 
 ```mermaid
 flowchart TB
-  subgraph apps["apps/* (capa de entrega · NestJS)"]
+  subgraph apps["apps/* (delivery layer · NestJS)"]
     A1[api<br/>controllers · SSE]
-    A2[mcp-server<br/>tools MCP]
+    A2[mcp-server<br/>MCP tools]
     A3[worker<br/>jobs]
   end
-  subgraph app["packages/core/application (casos de uso)"]
+  subgraph app["packages/core/application (use cases)"]
     UC[GetDailyBriefing · BlockFocusTime · CreateDraft<br/>SyncAccount · DiscoverProjects · RefreshHighlights<br/>LinkEntity · ProposeAction · ApproveAction …]
   end
-  subgraph dom["packages/core/domain (TS puro)"]
-    E[Entidades y value objects<br/>MailThread · CalendarEvent · Task · Project · Person · Account]
-    S[Servicios de dominio<br/>FreeSlotFinder · ThreadLinker · EmailCleaner · PriorityRules]
-    P[Puertos (interfaces)]
+  subgraph dom["packages/core/domain (pure TS)"]
+    E[Entities and value objects<br/>MailThread · CalendarEvent · Task · Project · Person · Account]
+    S[Domain services<br/>FreeSlotFinder · ThreadLinker · EmailCleaner · PriorityRules]
+    P[Ports (interfaces)]
   end
-  subgraph adapters["packages/adapters-* (infraestructura)"]
+  subgraph adapters["packages/adapters-* (infrastructure)"]
     AG[adapters-google]
     AT[adapters-transport<br/>local · ssh]
     AA[adapters-agent<br/>claude-code]
@@ -89,13 +89,13 @@ flowchart TB
   end
   apps --> app
   app --> dom
-  adapters -- implementan --> P
-  apps -. composición (DI) .-> adapters
+  adapters -- implement --> P
+  apps -. composition (DI) .-> adapters
 ```
 
-**Regla de dependencias:** las flechas apuntan hacia adentro. `domain` no importa nada externo; `application` sólo importa `domain`; los adaptadores importan `domain` (para implementar puertos) y sus SDKs; las apps son la **raíz de composición** que conecta todo con la inyección de dependencias de NestJS. Una regla de lint (`eslint-plugin-boundaries` o `dependency-cruiser`) hace cumplir esto en CI.
+**Dependency rule:** arrows point inwards. `domain` imports nothing external; `application` only imports `domain`; adapters import `domain` (to implement ports) and their SDKs; apps are the **composition root** that wires everything together with NestJS dependency injection. A lint rule (`dependency-cruiser`) enforces this.
 
-## 4. Puertos principales
+## 4. Main ports
 
 ```mermaid
 classDiagram
@@ -178,9 +178,9 @@ classDiagram
   AgentSummarizer --> AgentRunner
 ```
 
-Además, un puerto de repositorio por agregado (`AccountRepository`, `ProjectRepository`, `MailRepository`, `EventRepository`, `TaskRepository`, `PersonRepository`, `HighlightRepository`, `PendingActionRepository`, `SyncStateRepository`), implementados con Drizzle.
+In addition, one repository port per aggregate (`AccountRepository`, `ProjectRepository`, `MailRepository`, `EventRepository`, `TaskRepository`, `PersonRepository`, `HighlightRepository`, `PendingActionRepository`, `SyncStateRepository`), implemented with Drizzle.
 
-### Registros y fábricas (O de SOLID)
+### Registries and factories (the O in SOLID)
 
 ```mermaid
 classDiagram
@@ -202,7 +202,7 @@ classDiagram
   class GoogleProviderFactory
   class MicrosoftProviderFactory
   ProviderFactory <|.. GoogleProviderFactory
-  ProviderFactory <|.. MicrosoftProviderFactory : futuro
+  ProviderFactory <|.. MicrosoftProviderFactory : future
   ProviderRegistry o-- ProviderFactory
   ProviderFactory ..> ProviderBundle
 
@@ -216,11 +216,11 @@ classDiagram
   }
 ```
 
-Las diferencias entre proveedores se consultan por **capacidades** (`ProviderCapabilities`: `threads`, `replyHeaders`, `sendAsAliases`, `taskLists`, `freeBusy`…), nunca con `instanceof`.
+Provider differences are queried through **capabilities** (`ProviderCapabilities`: `threads`, `replyHeaders`, `sendAsAliases`, `taskLists`, `freeBusy`…), never with `instanceof`.
 
-## 5. Flujos clave
+## 5. Key flows
 
-### 5.1 Sincronización de una cuenta
+### 5.1 Syncing an account
 
 ```mermaid
 sequenceDiagram
@@ -228,42 +228,42 @@ sequenceDiagram
   participant UC as SyncAccount
   participant R as ProviderRegistry
   participant P as GmailAdapter / Calendar / Tasks
-  participant DB as Repositorios
+  participant DB as Repositories
   W->>UC: execute(accountId)
   UC->>DB: syncState(account, resource)
   UC->>R: forAccount(account)
   R-->>UC: ProviderBundle
   UC->>P: sync(cursor)
-  P-->>UC: cambios + nuevo cursor
-  UC->>DB: upsert entidades (+ raw JSONB)
-  UC->>UC: ThreadLinker / EventLinker (vinculación derivada)
-  UC->>DB: guardar vínculos + cursor
-  Note over UC,DB: si el cursor expira → resync completo acotado (90 días)
+  P-->>UC: changes + new cursor
+  UC->>DB: upsert entities (+ raw JSONB)
+  UC->>UC: ThreadLinker / EventLinker (derived linking)
+  UC->>DB: store links + cursor
+  Note over UC,DB: if the cursor expires → bounded full resync (90 days)
 ```
 
-### 5.2 Descubrimiento y snapshot de proyectos
+### 5.2 Project discovery and snapshots
 
 ```mermaid
 sequenceDiagram
   participant W as worker
   participant D as DiscoverProjects
   participant T as ProjectTransport (local|ssh)
-  participant DB as Repositorios
+  participant DB as Repositories
   participant Q as AiJobQueue
   W->>D: execute(serverId)
   D->>T: listClaudeProjects()
-  T-->>D: dirs en ~/.claude/projects
-  D->>T: stat(candidatos) · gitRemote(ruta)
-  D->>DB: discovery_proposals (pendientes de confirmar)
-  Note over W: proyectos confirmados
-  W->>T: readFile(documentos registrados) · gitLog(since)
+  T-->>D: dirs in ~/.claude/projects
+  D->>T: stat(candidates) · gitRemote(path)
+  D->>DB: discovery_proposals (pending confirmation)
+  Note over W: confirmed projects
+  W->>T: readFile(registered documents) · gitLog(since)
   W->>DB: document_snapshots (hash, mtime) · commits
-  alt algún hash cambió
-    W->>Q: enqueue RefreshHighlights(project) (debounce 2h)
+  alt some hash changed
+    W->>Q: enqueue RefreshHighlights(project) (2h debounce)
   end
 ```
 
-### 5.3 Chat con aprobación de acciones
+### 5.3 Chat with action approval
 
 ```mermaid
 sequenceDiagram
@@ -273,107 +273,107 @@ sequenceDiagram
   participant CLI as claude -p
   participant MCP as mcp-server
   UI->>API: POST /chat {sessionId, message}
-  API->>AR: run({prompt, allowedTools: lectura + propose_action, resume})
+  API->>AR: run({prompt, allowedTools: read-only + propose_action, resume})
   AR->>CLI: spawn (stream-json, --mcp-config, --allowedTools)
   CLI->>MCP: get_project_status / search_emails …
-  MCP-->>CLI: datos
+  MCP-->>CLI: data
   CLI->>MCP: propose_action(create_gmail_draft, params, rationale)
   MCP-->>CLI: pending_action_id
-  CLI-->>AR: eventos (texto, tool_use, resultado)
+  CLI-->>AR: events (text, tool_use, result)
   AR-->>API: AgentEvent stream
   API-->>UI: SSE
   UI->>API: POST /actions/{id}/approve
-  API->>MCP: create_gmail_draft(params)  (cliente MCP)
+  API->>MCP: create_gmail_draft(params)  (MCP client)
   MCP-->>API: draftId
-  API-->>UI: confirmado
+  API-->>UI: confirmed
 ```
 
-### 5.4 Cola de IA en segundo plano
+### 5.4 Background AI queue
 
-`AiJobQueue` (tabla en Postgres + procesador en `worker`): concurrencia 1, debounce por clave (`highlights:<project>`), tope diario configurable, ventana horaria para resúmenes de reunión (07:30) y recuperación de ejecuciones atrasadas al arrancar. Cada ejecución registra duración, motivo y resultado.
+`AiJobQueue` (Postgres table + processor in `worker`): concurrency 1, per-key debounce (`highlights:<project>`), configurable daily cap, time window for meeting briefs (07:30) and catch-up of missed runs on startup. Each run records duration, reason and result.
 
-### 5.5 Espejo de tareas
+### 5.5 Task mirror
 
-`TaskChange` en una lista asociada a un proyecto → `MirrorTasks(project)` → render Markdown → `ProjectTransport.ensureGitExclude` + `writeJarvisFile(".jarvis/tasks.md")`.
+`TaskChange` in a list linked to a project → `MirrorTasks(project)` → Markdown render → `ProjectTransport.ensureGitExclude` + `writeJarvisFile(".jarvis/tasks.md")`.
 
-## 6. Modelo de datos
+## 6. Data model
 
 ```mermaid
 erDiagram
-  ACCOUNT ||--o{ MAIL_THREAD : sincroniza
-  ACCOUNT ||--o{ CALENDAR : sincroniza
-  ACCOUNT ||--o{ TASK_LIST : sincroniza
-  ACCOUNT ||--o{ SYNC_STATE : tiene
-  MAIL_THREAD ||--o{ MAIL_MESSAGE : contiene
-  CALENDAR ||--o{ EVENT : contiene
-  TASK_LIST ||--o{ TASK : contiene
-  TASK_LIST }o--o| PROJECT : "pertenece a (0..1)"
-  SERVER ||--o{ PROJECT : aloja
-  SERVER ||--o{ DISCOVERY_PROPOSAL : produce
-  PROJECT ||--o{ PROJECT_DOCUMENT : registra
-  PROJECT_DOCUMENT ||--o{ DOCUMENT_SNAPSHOT : versiona
-  PROJECT ||--o{ PROJECT_HIGHLIGHT : versiona
-  PROJECT ||--o{ COMMIT : registra
+  ACCOUNT ||--o{ MAIL_THREAD : syncs
+  ACCOUNT ||--o{ CALENDAR : syncs
+  ACCOUNT ||--o{ TASK_LIST : syncs
+  ACCOUNT ||--o{ SYNC_STATE : has
+  MAIL_THREAD ||--o{ MAIL_MESSAGE : contains
+  CALENDAR ||--o{ EVENT : contains
+  TASK_LIST ||--o{ TASK : contains
+  TASK_LIST }o--o| PROJECT : "belongs to (0..1)"
+  SERVER ||--o{ PROJECT : hosts
+  SERVER ||--o{ DISCOVERY_PROPOSAL : produces
+  PROJECT ||--o{ PROJECT_DOCUMENT : registers
+  PROJECT_DOCUMENT ||--o{ DOCUMENT_SNAPSHOT : versions
+  PROJECT ||--o{ PROJECT_HIGHLIGHT : versions
+  PROJECT ||--o{ COMMIT : records
   PERSON }o--o{ PROJECT : "PERSON_PROJECT"
-  MAIL_THREAD }o--o{ PROJECT : "THREAD_PROJECT (derivado|sugerido|manual)"
-  EVENT }o--o{ PROJECT : "EVENT_PROJECT (derivado|manual)"
-  EVENT ||--o| MEETING_BRIEF : tiene
-  MAIL_MESSAGE }o--o{ PERSON : participantes
-  EVENT }o--o{ PERSON : invitados
-  CHAT_SESSION ||--o{ PENDING_ACTION : propone
-  AI_JOB }o--|| PROJECT : "sobre (opcional)"
+  MAIL_THREAD }o--o{ PROJECT : "THREAD_PROJECT (derived|suggested|manual)"
+  EVENT }o--o{ PROJECT : "EVENT_PROJECT (derived|manual)"
+  EVENT ||--o| MEETING_BRIEF : has
+  MAIL_MESSAGE }o--o{ PERSON : participants
+  EVENT }o--o{ PERSON : attendees
+  CHAT_SESSION ||--o{ PENDING_ACTION : proposes
+  AI_JOB }o--|| PROJECT : "about (optional)"
 ```
 
-Convenciones: IDs internos UUID; IDs externos como `(account_id, external_id)` únicos; columna `raw jsonb` con la respuesta original del proveedor; `created_at`/`updated_at` en todo; los vínculos guardan `origin` y `created_at` para analíticas históricas.
+Conventions: internal UUID IDs; external IDs unique as `(account_id, external_id)`; a `raw jsonb` column with the provider's original response; `created_at`/`updated_at` everywhere; links store `origin` and `created_at` for historical analytics.
 
-## 7. Estructura del repositorio
+## 7. Repository layout
 
 ```
 jarvis/
 ├─ apps/
-│  ├─ api/            NestJS: módulos chat, actions, registry, links, read-models
-│  ├─ mcp-server/     NestJS + MCP SDK: un provider por grupo de herramientas
+│  ├─ api/            NestJS: chat, actions, registry, links, read-models modules
+│  ├─ mcp-server/     NestJS + MCP SDK: one provider per tool group
 │  ├─ worker/         NestJS + schedule: sync, discovery, snapshots, mirror, ai-queue
 │  └─ web/            React + Vite
 ├─ packages/
 │  ├─ core/
-│  │  ├─ domain/       entidades, value objects, servicios, puertos
-│  │  └─ application/  casos de uso
+│  │  ├─ domain/       entities, value objects, services, ports
+│  │  └─ application/  use cases
 │  ├─ adapters-google/
 │  ├─ adapters-transport/   local, ssh
 │  ├─ adapters-agent/       claude-code
-│  ├─ adapters-persistence/ drizzle (schema, migraciones, repositorios)
-│  ├─ contracts/            tests de contrato por puerto (reutilizables por adaptadores)
-│  └─ shared/               DTOs y esquemas Zod (api ↔ web ↔ mcp)
-├─ agent/             instrucciones, skills y permisos del agente (versionados)
-├─ remote/            jarvis-remote (forced command SSH) + instalador
+│  ├─ adapters-persistence/ drizzle (schema, migrations, repositories)
+│  ├─ contracts/            per-port contract tests (reusable by adapters)
+│  └─ shared/               DTOs and Zod schemas (api ↔ web ↔ mcp)
+├─ agent/             agent instructions, skills and permissions (versioned)
+├─ remote/            jarvis-remote (SSH forced command) + installer
 ├─ docker/            Dockerfiles
-├─ docs/              arquitectura, specs, planes
-├─ secrets/           (git-ignorado) OAuth, tokens, claves
+├─ docs/              architecture, specs, plans
+├─ secrets/           (git-ignored) OAuth, tokens, keys
 ├─ jarvis.config.example.yaml
 └─ docker-compose.yml
 ```
 
-## 8. Seguridad (resumen técnico)
+## 8. Security (technical summary)
 
-| Riesgo | Mitigación |
+| Risk | Mitigation |
 |---|---|
-| Envío de correos no deseado | No existe puerto ni herramienta de envío; scope `gmail.compose` sólo se usa para borradores. |
-| Acciones del agente sin control | En el chat, sólo herramientas de lectura + `propose_action`; la ejecución real la dispara `api` tras aprobación. |
-| Prompt injection desde correos/documentos | Contenido externo delimitado y marcado como no confiable; el agente no tiene Bash ni edición de archivos. |
-| Ejecución arbitraria en servidores | `SshTransport` sólo con operaciones con nombre + `jarvis-remote` como forced command en `authorized_keys`. |
-| Escritura indebida en repos | Sólo `writeJarvisFile` bajo `.jarvis/`; exclusión en `.git/info/exclude`; nunca commits. |
-| Secretos | Docker secrets desde `secrets/` (git-ignorado); tokens OAuth 0600; nada sensible en logs. |
-| Exposición de red | Puertos en `127.0.0.1`; MCP con token bearer. |
+| Unwanted email sending | There is no send port or tool; the `gmail.compose` scope is only used for drafts. |
+| Uncontrolled agent actions | In chat, only read tools + `propose_action`; the real execution is triggered by `api` after approval. |
+| Prompt injection from emails/documents | External content is delimited and marked as untrusted; the agent has no Bash or file editing. |
+| Arbitrary execution on servers | `SshTransport` only with named operations + `jarvis-remote` as forced command in `authorized_keys`. |
+| Improper writes to repos | Only `writeJarvisFile` under `.jarvis/`; excluded via `.git/info/exclude`; never commits. |
+| Secrets | Docker secrets from `secrets/` (git-ignored); OAuth tokens 0600; nothing sensitive in logs. |
+| Network exposure | Ports on `127.0.0.1`; MCP with bearer token. |
 
-## 9. Cómo extender
+## 9. How to extend
 
-**Nuevo proveedor (p. ej. Microsoft 365)**
-1. Crear `packages/adapters-microsoft` con clases que implementen los puertos necesarios (`MailReader`, `DraftWriter`, …) y declaren sus `capabilities()`.
-2. Implementar `MicrosoftProviderFactory` y `MicrosoftOAuthFlow`.
-3. Hacer pasar la suite de `packages/contracts` para cada puerto.
-4. Registrar la fábrica en `ProviderRegistry` (módulo Nest de proveedores). Dominio y casos de uso no cambian.
+**New provider (e.g. Microsoft 365)**
+1. Create `packages/adapters-microsoft` with classes that implement the needed ports (`MailReader`, `DraftWriter`, …) and declare their `capabilities()`.
+2. Implement `MicrosoftProviderFactory` and `MicrosoftOAuthFlow`.
+3. Make the `packages/contracts` suite pass for each port.
+4. Register the factory in `ProviderRegistry` (providers Nest module). Domain and use cases do not change.
 
-**Nuevo transporte** (p. ej. agente remoto por HTTP): implementar `ProjectTransport`, pasar contratos, registrar en `TransportRegistry`, agregar el `kind` al esquema de configuración.
+**New transport** (e.g. a remote agent over HTTP): implement `ProjectTransport`, pass the contracts, register it in `TransportRegistry`, add the `kind` to the config schema.
 
-**Nuevo agente**: implementar `AgentRunner` (streaming de `AgentEvent`, sesiones, herramientas MCP permitidas) y registrarlo en `AgentRegistry`. `AgentSummarizer` funciona sobre cualquier `AgentRunner`.
+**New agent**: implement `AgentRunner` (`AgentEvent` streaming, sessions, allowed MCP tools) and register it in `AgentRegistry`. `AgentSummarizer` works on top of any `AgentRunner`.

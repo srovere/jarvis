@@ -54,7 +54,7 @@ export class CalendarMapper {
     return null;
   }
 
-  /** Eventos de duración cero o negativa se ensanchan a 1 minuto: siguen visibles y no abortan la lectura. */
+  /** Zero- or negative-length events are widened to 1 minute: they stay visible and do not abort the read. */
   private safeRange(s: DateTime, f: DateTime): TimeRange {
     return new TimeRange(s, f > s ? f : s.plus({ minutes: 1 }));
   }

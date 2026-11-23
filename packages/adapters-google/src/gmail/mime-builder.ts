@@ -12,7 +12,7 @@ export interface MimeDraft {
 
 const CRLF = '\r\n';
 const NON_ASCII = /[^\x20-\x7e]/;
-// Un encoded-word completo mide como máximo 75 caracteres; 45 bytes UTF-8 -> 60 en base64 + 12 de envoltorio.
+// A full encoded-word is at most 75 chars; 45 UTF-8 bytes -> 60 in base64 + 12 of wrapper.
 const MAX_WORD_BYTES = 45;
 
 const oneLine = (value: string): string => value.replace(/[\r\n]+/g, ' ').trim();
@@ -32,7 +32,7 @@ function encodedWords(text: string): string {
   return words.join(`${CRLF} `);
 }
 
-/** RFC 2047 sólo cuando hay caracteres no ASCII. */
+/** RFC 2047 only when there are non-ASCII characters. */
 function encodeHeaderText(text: string): string {
   const clean = oneLine(text);
   return NON_ASCII.test(clean) ? encodedWords(clean) : clean;
@@ -53,7 +53,7 @@ function base64Lines(text: string): string {
   return (b64.match(/.{1,76}/g) ?? []).join(CRLF);
 }
 
-/** Construye un mensaje RFC 5322 `text/plain; charset=UTF-8` y lo devuelve codificado en base64url (campo `raw` de Gmail). */
+/** Builds an RFC 5322 `text/plain; charset=UTF-8` message and returns it base64url-encoded (Gmail `raw` field). */
 export function buildMime(d: MimeDraft): string {
   const headers = [
     `From: ${formatAddress(d.from)}`,

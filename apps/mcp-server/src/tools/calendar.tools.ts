@@ -56,7 +56,7 @@ export class CalendarTools implements ToolGroup {
       ({ from, to }) =>
         this.runner.run('list_events', async () => {
           const events = await this.events.execute({ from, to });
-          return { text: section('Eventos', events.map((e) => eventLine(e)), 'eventos en ese rango'), structured: { events } };
+          return { text: section('Events', events.map((e) => eventLine(e)), 'events in that range'), structured: { events } };
         }),
     );
   }
@@ -81,8 +81,8 @@ export class CalendarTools implements ToolGroup {
           });
           return {
             text: slot
-              ? `Primer hueco libre: ${dateTime(slot.start)}–${time(slot.end)}`
-              : `No hay un hueco libre de ${duration_minutes} minutos en el horizonte de búsqueda.`,
+              ? `First free slot: ${dateTime(slot.start)}–${time(slot.end)}`
+              : `No free slot of ${duration_minutes} minutes within the search horizon.`,
             structured: { slot },
           };
         }),
@@ -129,10 +129,10 @@ export class CalendarTools implements ToolGroup {
 function focusSummary(task: string, r: BlockFocusResult): string {
   switch (r.status) {
     case 'created':
-      return `Bloque de foco «${task}» creado: ${dateTime(r.start)}–${time(r.end)}${r.htmlLink ? ` (${r.htmlLink})` : ''}`;
+      return `Focus block "${task}" created: ${dateTime(r.start)}–${time(r.end)}${r.htmlLink ? ` (${r.htmlLink})` : ''}`;
     case 'already_exists':
-      return `Ya existe un bloque de foco «${task}»: ${dateTime(r.start)}–${time(r.end)}`;
+      return `A focus block "${task}" already exists: ${dateTime(r.start)}–${time(r.end)}`;
     case 'no_slot':
-      return `No hay hueco libre para «${task}» en los próximos ${r.searchedWorkDays} días hábiles.`;
+      return `No free slot for "${task}" in the next ${r.searchedWorkDays} work days.`;
   }
 }

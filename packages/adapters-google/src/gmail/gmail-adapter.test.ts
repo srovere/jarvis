@@ -28,7 +28,7 @@ describe('GmailAdapter drafts', () => {
   it('replies to the non-own recipient when the last message is from an alias (Review Focus 2)', async () => {
     const { fake, adapter } = setup({ sendAs: ['me@x.com', 'yo@gmail.com'] });
     fake.seed([
-      buildThread('t1', 'Hola', [
+      buildThread('t1', 'Hello', [
         msg('m1', 0, { from: 'cliente@x.com', to: ['yo@gmail.com'] }),
         msg('m2', 5, { from: 'yo@gmail.com', to: ['cliente@x.com'] }),
       ]),
@@ -69,7 +69,7 @@ describe('GmailAdapter drafts', () => {
   it('anchors a second draft on the real last message, not on the first (unsent) draft', async () => {
     const { fake, adapter } = setup();
     fake.seed([
-      buildThread('t1', 'Hola', [{ ...msg('m1', 0), messageIdHeader: '<m1@x>' }]),
+      buildThread('t1', 'Hello', [{ ...msg('m1', 0), messageIdHeader: '<m1@x>' }]),
     ]);
     await adapter.createDraft({ threadId: 't1', body: 'uno' });
     const ref = await adapter.createDraft({ threadId: 't1', body: 'dos' });
@@ -81,7 +81,7 @@ describe('GmailAdapter drafts', () => {
 
   it('sync after a draft is created contains no upsert for the draft', async () => {
     const { fake, adapter } = setup();
-    fake.seed([buildThread('t1', 'Hola', [msg('m1', 0)])]);
+    fake.seed([buildThread('t1', 'Hello', [msg('m1', 0)])]);
     const first = await adapter.sync(null, OPTS);
     await adapter.createDraft({ threadId: 't1', body: 'uno' });
     const r = await adapter.sync(first.nextCursor, OPTS);
@@ -106,7 +106,7 @@ describe('GmailAdapter drafts', () => {
     const { fake, adapter } = setup({ sendAs: ['me@x.com', 'yo@gmail.com'] });
     fake.seed([buildThread('t1', 'Nota', [msg('m1', 0, { from: 'me@x.com', to: ['yo@gmail.com'] })])]);
     await expect(adapter.createDraft({ threadId: 't1', body: 'x' })).rejects.toThrow(
-      'No hay destinatario para responder en este hilo',
+      'No recipient to reply to in this thread',
     );
   });
 
@@ -119,15 +119,15 @@ describe('GmailAdapter drafts', () => {
 describe('GmailAdapter reading', () => {
   it('returns only bodyHtml for an HTML-only message', async () => {
     const { fake, adapter } = setup();
-    fake.seed([buildThread('t1', 'Hola', [{ ...msg('m1', 0), bodyHtml: '<p>Hola <b>mundo</b></p>' }])]);
+    fake.seed([buildThread('t1', 'Hello', [{ ...msg('m1', 0), bodyHtml: '<p>Hello <b>world</b></p>' }])]);
     const m = (await adapter.getThread('t1')).messages[0]!;
-    expect(m.bodyHtml).toBe('<p>Hola <b>mundo</b></p>');
+    expect(m.bodyHtml).toBe('<p>Hello <b>world</b></p>');
     expect(m.bodyText).toBeUndefined();
   });
 
   it('decodes text/plain and text/html, honouring the declared charset', async () => {
     const { fake, adapter } = setup();
-    fake.seed([buildThread('t1', 'Hola', [{ ...msg('m1', 0), bodyText: 'ñandú ✓', bodyHtml: '<p>ñandú</p>' }])]);
+    fake.seed([buildThread('t1', 'Hello', [{ ...msg('m1', 0), bodyText: 'ñandú ✓', bodyHtml: '<p>ñandú</p>' }])]);
     const m = (await adapter.getThread('t1')).messages[0]!;
     expect(m.bodyText).toBe('ñandú ✓');
     expect(m.bodyHtml).toBe('<p>ñandú</p>');
@@ -206,8 +206,8 @@ describe('GmailAdapter reading', () => {
 
   it('listThreads fetches metadata with the fixed headers', async () => {
     const { fake, adapter } = setup();
-    fake.seed([buildThread('t1', 'Hola', [msg('m1', 0)])]);
-    const found = await adapter.listThreads({ query: 'hola', maxResults: 5 });
+    fake.seed([buildThread('t1', 'Hello', [msg('m1', 0)])]);
+    const found = await adapter.listThreads({ query: 'hello', maxResults: 5 });
     expect(found.map((t) => t.id)).toEqual(['t1']);
     expect(found[0]!.lastFrom.address).toBe('a@y.com');
     expect(fake.calls.threadsGet).toHaveBeenCalledWith(
@@ -220,7 +220,7 @@ describe('GmailAdapter sync', () => {
   it('full sync paginates, windows by newer_than and uses the profile historyId as cursor', async () => {
     const { fake, adapter } = setup({ pageSize: 2 });
     fake.seed([
-      buildThread('t1', 'Hola', [msg('m1', 0), msg('m2', 1), msg('m3', 2)]),
+      buildThread('t1', 'Hello', [msg('m1', 0), msg('m2', 1), msg('m3', 2)]),
       buildThread('old', 'Viejo', [
         buildMessage({ id: 'old1', threadId: 'old', from: 'a@y.com', to: ['me@x.com'], minutes: -200 * 24 * 60 }),
       ]),
@@ -236,9 +236,9 @@ describe('GmailAdapter sync', () => {
 
   it('incremental sync dedupes per message id and maps added, relabelled and deleted messages', async () => {
     const { fake, adapter } = setup({ pageSize: 1 });
-    fake.seed([buildThread('t1', 'Hola', [msg('m1', 0), msg('m2', 1)])]);
+    fake.seed([buildThread('t1', 'Hello', [msg('m1', 0), msg('m2', 1)])]);
     const first = await adapter.sync(null, OPTS);
-    fake.seed([buildThread('t1', 'Hola', [msg('m1', 0), msg('m2', 1), msg('m3', 2)])]);
+    fake.seed([buildThread('t1', 'Hello', [msg('m1', 0), msg('m2', 1), msg('m3', 2)])]);
     fake.setLabels('m1', ['INBOX', 'STARRED']);
     fake.setLabels('m1', ['INBOX']);
     fake.removeMessage('m2');
@@ -258,7 +258,7 @@ describe('GmailAdapter sync', () => {
 
   it('falls back to a full resync when history.list answers 404 (Review Focus 1)', async () => {
     const { fake, adapter } = setup();
-    fake.seed([buildThread('t1', 'Hola', [msg('m1', 0)])]);
+    fake.seed([buildThread('t1', 'Hello', [msg('m1', 0)])]);
     fake.expireHistory();
     const r = await adapter.sync('123', OPTS);
     expect(r.fullResync).toBe(true);
@@ -268,7 +268,7 @@ describe('GmailAdapter sync', () => {
 
   it('turns a stored message that is now in TRASH or SPAM into a delete', async () => {
     const { fake, adapter } = setup();
-    fake.seed([buildThread('t1', 'Hola', [msg('m1', 0), msg('m2', 1)])]);
+    fake.seed([buildThread('t1', 'Hello', [msg('m1', 0), msg('m2', 1)])]);
     const first = await adapter.sync(null, OPTS);
     fake.setLabels('m1', ['TRASH']);
     fake.setLabels('m2', ['INBOX', 'SPAM']);
@@ -285,7 +285,7 @@ describe('GmailAdapter sync', () => {
   it('treats a 404 on a history-referenced message as a delete', async () => {
     const { fake, adapter } = setup();
     const first = await adapter.sync(null, OPTS);
-    fake.seed([buildThread('t1', 'Hola', [msg('m1', 0)])]);
+    fake.seed([buildThread('t1', 'Hello', [msg('m1', 0)])]);
     fake.dropMessageSilently('m1');
     const r = await adapter.sync(first.nextCursor, OPTS);
     expect(r.changes).toEqual([{ kind: 'delete', messageId: 'm1' }]);

@@ -19,12 +19,12 @@ export class CreateDraft {
     threadId?: string;
     accountId?: string;
   }): Promise<{ draftId: string; threadId?: string; to: string[]; subject: string; gmailUrl: string }> {
-    if (!q.to?.length && !q.threadId) throw new DomainError('Se necesita "to" o "thread_id"');
+    if (!q.to?.length && !q.threadId) throw new DomainError('Either "to" or "thread_id" is required');
     const to = this.parse(q.to);
     const cc = this.parse(q.cc);
     const account = await selectAccount(this.accounts, q.accountId);
     const mail = (await this.registry.forAccount(account)).mail;
-    if (!mail) throw new DomainError(`La cuenta ${account.id} no soporta correo`);
+    if (!mail) throw new DomainError(`Account ${account.id} does not support email`);
 
     const ref = await mail.createDraft({
       ...(to.length ? { to } : {}),
@@ -47,7 +47,7 @@ export class CreateDraft {
       try {
         return EmailAddress.parse(r);
       } catch (e) {
-        if (e instanceof InvalidEmailAddress) throw new DomainError(`Dirección inválida: ${r}`);
+        if (e instanceof InvalidEmailAddress) throw new DomainError(`Invalid address: ${r}`);
         throw e;
       }
     });

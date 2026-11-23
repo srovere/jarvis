@@ -1,51 +1,51 @@
-# Copiar a jarvis.config.yaml (git-ignorado). Todas las claves son opcionales;
-# los valores mostrados son los predeterminados.
-# Cualquier clave escalar o lista simple puede sobrescribirse por entorno con
-# JARVIS__SECCION__CLAVE (sin distinguir mayúsculas), p. ej. JARVIS__SYNC__INTERVALMINUTES=10.
+# Copy to jarvis.config.yaml (git-ignored). Every key is optional;
+# the values shown are the defaults.
+# Any scalar key or simple list can be overridden from the environment with
+# JARVIS__SECTION__KEY (case-insensitive), e.g. JARVIS__SYNC__INTERVALMINUTES=10.
 
-# Zona horaria IANA.
+# IANA time zone.
 timezone: America/Argentina/Buenos_Aires
 
-# Horario laboral: horas 0..24 (startHour < endHour); días ISO (1 = lunes ... 7 = domingo).
+# Working hours: hours 0..24 (startHour < endHour); ISO days (1 = Monday ... 7 = Sunday).
 workSchedule:
   startHour: 9
   endHour: 19
   workDays: [1, 2, 3, 4, 5]
 
-# Bloques de foco.
+# Focus blocks.
 focus:
   titlePrefix: "[Focus] "
-  horizonWorkDays: 5 # horizonte en días hábiles
+  horizonWorkDays: 5 # horizon in work days
   defaultDurationMinutes: 90
 
-# Sincronización.
+# Sync.
 sync:
   intervalMinutes: 5
   gmailInitialWindowDays: 90
 
-# Resumen diario.
+# Daily briefing.
 briefing:
   maxPriorityEmails: 10
 
-# Correo.
+# Email.
 email:
   maxBodyChars: 4000
 
-# Servidor MCP (publicar sólo en 127.0.0.1).
+# MCP server (publish on 127.0.0.1 only).
 mcp:
   bind: 127.0.0.1
   port: 3002
   tokenFile: /run/secrets/mcp_token
 
-# Directorios de secretos y datos.
+# Secrets and data directories.
 secretsDir: /run/secrets
 dataDir: /data
 
-# Cuentas conectadas. `id` en minúsculas (a-z, 0-9, _ y -), único.
-# `calendars`: ids de calendarios que cuentan como ocupado (por defecto, el principal).
+# Connected accounts. `id` is lowercase (a-z, 0-9, _ and -) and unique.
+# `calendars`: ids of calendars that count as busy (default: the primary one).
 accounts: []
 # accounts:
 #   - id: personal
 #     provider: google
-#     email: persona@example.com
+#     email: person@example.com
 #     calendars: [primary]

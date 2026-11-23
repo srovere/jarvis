@@ -1,6 +1,6 @@
 import { convert } from 'html-to-text';
 
-/** Convierte HTML de correo a texto plano: sin ajuste de línea, sin imágenes y con enlaces sólo como texto. */
+/** Converts email HTML to plain text: no line wrapping, no images, links as text only. */
 export function htmlToPlainText(html: string): string {
   return convert(html, {
     wordwrap: false,

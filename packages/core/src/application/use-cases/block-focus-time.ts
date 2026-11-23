@@ -44,12 +44,12 @@ export class BlockFocusTime {
     if (!slot) return { status: 'no_slot', searchedWorkDays: focus.horizonWorkDays };
 
     const calendar = (await this.registry.forAccount(account)).calendar;
-    if (!calendar) throw new DomainError(`La cuenta ${account.id} no soporta calendario`);
+    if (!calendar) throw new DomainError(`Account ${account.id} does not support calendar`);
     const created = await calendar.createEvent({
       calendarId: 'primary',
       title,
       range: slot,
-      description: 'Bloque de foco creado por Jarvis',
+      description: 'Focus block created by Jarvis',
       transparency: 'opaque',
     });
     const stored: CalendarEvent = {

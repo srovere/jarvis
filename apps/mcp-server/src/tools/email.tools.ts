@@ -33,7 +33,7 @@ export class EmailTools implements ToolGroup {
         title: 'Search emails',
         description:
           "Search the user's mailboxes live (every active account) with Gmail search syntax, e.g. " +
-          '"from:ana subject:presupuesto newer_than:7d". Returns the latest message of each matching thread, newest ' +
+          '"from:ana subject:budget newer_than:7d". Returns the latest message of each matching thread, newest ' +
           `first. Use it to find specific emails; then use read_thread for the whole conversation. ${UNTRUSTED}`,
         inputSchema: {
           query: z.string().min(1).describe('Gmail search query.'),
@@ -45,7 +45,7 @@ export class EmailTools implements ToolGroup {
         this.runner.run('search_emails', async () => {
           const emails = wrapBodies(await this.search.execute({ query, maxResults: max_results }));
           return {
-            text: section(`Correos para «${query}»`, emails.map(emailBlock), 'correos que coincidan'),
+            text: section(`Emails for "${query}"`, emails.map(emailBlock), 'matching emails'),
             structured: { emails },
           };
         }),
@@ -75,7 +75,7 @@ export class EmailTools implements ToolGroup {
           });
           const structured = { ...view, messages: wrapBodies(view.messages) };
           return {
-            text: `Hilo «${view.subject}» [${view.threadId}]\n${section('Mensajes', structured.messages.map(emailBlock), 'mensajes')}`,
+            text: `Thread "${view.subject}" [${view.threadId}]\n${section('Messages', structured.messages.map(emailBlock), 'messages')}`,
             structured,
           };
         }),
@@ -117,8 +117,8 @@ export class EmailTools implements ToolGroup {
           });
           return {
             text:
-              `Borrador creado (no enviado) para ${draft.to.join(', ') || '(sin destinatarios)'} — ` +
-              `asunto «${draft.subject}». Revisalo y envialo desde Gmail: ${draft.gmailUrl}`,
+              `Draft created (not sent) to ${draft.to.join(', ') || '(no recipients)'} — ` +
+              `subject "${draft.subject}". Review and send it from Gmail: ${draft.gmailUrl}`,
             structured: draft,
           };
         }),

@@ -73,7 +73,7 @@ describe('SyncAccount', () => {
     const second = await useCase().execute('a2');
 
     expect((await f.repos.accounts.get('a1')).status).toBe('needs_reauth');
-    expect(f.repos.accounts.statusDetails.get('a1')).toBe('ejecutá pnpm jarvis auth --account a1');
+    expect(f.repos.accounts.statusDetails.get('a1')).toBe('run pnpm jarvis auth --account a1');
     expect(calendarSync).not.toHaveBeenCalled();
     expect(second.resources).toEqual({ mail: 'ok', calendar: 'ok', tasks: 'ok' });
     expect((await f.repos.accounts.get('a2')).status).toBe('active');

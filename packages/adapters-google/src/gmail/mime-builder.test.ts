@@ -9,7 +9,7 @@ const split = (raw: string): { head: string; body: string } => {
   const [head, body] = decode(raw).split('\r\n\r\n');
   return { head: head!, body: body! };
 };
-const base = { from: a('me@x.com'), to: [a('c@y.com')], cc: [], subject: 'Hola', body: 'cuerpo' };
+const base = { from: a('me@x.com'), to: [a('c@y.com')], cc: [], subject: 'Hello', body: 'body' };
 
 describe('buildMime', () => {
   it('encodes a non-ASCII subject as RFC 2047 and round-trips', () => {
@@ -24,7 +24,7 @@ describe('buildMime', () => {
     expect(head.split('\r\n')).toEqual([
       'From: me@x.com',
       'To: c@y.com',
-      'Subject: Hola',
+      'Subject: Hello',
       'MIME-Version: 1.0',
       'Content-Type: text/plain; charset=UTF-8',
       'Content-Transfer-Encoding: base64',
@@ -42,10 +42,10 @@ describe('buildMime', () => {
   });
 
   it('base64-encodes a UTF-8 body and the whole message as base64url', () => {
-    const raw = buildMime({ ...base, body: 'línea 1\nñandú ✓' });
+    const raw = buildMime({ ...base, body: 'line 1\nñandú ✓' });
     expect(raw).toMatch(/^[A-Za-z0-9_-]+$/);
     const body = Buffer.from(split(raw).body.replace(/\r\n/g, ''), 'base64').toString('utf8');
-    expect(body).toBe('línea 1\r\nñandú ✓');
+    expect(body).toBe('line 1\r\nñandú ✓');
   });
 
   it('folds a long non-ASCII subject into several encoded words that decode back', () => {
@@ -59,7 +59,7 @@ describe('buildMime', () => {
   });
 
   it('strips line breaks from header values (no header injection)', () => {
-    const { head } = split(buildMime({ ...base, subject: 'Hola\r\nBcc: evil@z.com' }));
+    const { head } = split(buildMime({ ...base, subject: 'Hello\r\nBcc: evil@z.com' }));
     expect(head).not.toContain('\r\nBcc:');
   });
 

@@ -26,7 +26,7 @@ export class TasksMapper {
       raw: t,
     };
     if (t.notes) task.notes = t.notes;
-    // Google Tasks sólo guarda la fecha (como medianoche UTC): se interpreta como el inicio de ese día en la zona.
+    // Google Tasks only stores the date (as UTC midnight): read it as the start of that day in the zone.
     const dueDate = this.parse(t.due)?.toISODate();
     if (dueDate) task.due = DateTime.fromISO(dueDate, { zone: this.zone });
     const completed = this.parse(t.completed);

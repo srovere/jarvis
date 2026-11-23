@@ -34,7 +34,7 @@ export class McpController {
   private async existing(req: Request, res: Response, body?: unknown): Promise<void> {
     const sessionId = req.header('mcp-session-id');
     if (sessionId === undefined) {
-      res.status(400).json(rpcError(-32000, 'Bad Request: falta un mcp-session-id válido'));
+      res.status(400).json(rpcError(-32000, 'Bad Request: missing a valid mcp-session-id'));
       return;
     }
     const transport = this.sessions.get(sessionId);

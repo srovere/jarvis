@@ -8,7 +8,7 @@ import { TasksMapper } from './tasks-mapper';
 const PAGE_SIZE = 100;
 const EPOCH = '1970-01-01T00:00:00.000Z';
 
-/** Google Tasks como `TaskReader` y `TaskWriter`. */
+/** Google Tasks as `TaskReader` and `TaskWriter`. */
 export class GoogleTasksAdapter implements TaskReader, TaskWriter {
   private readonly mapper: TasksMapper;
 
@@ -20,7 +20,7 @@ export class GoogleTasksAdapter implements TaskReader, TaskWriter {
     this.mapper = new TasksMapper(accountId, zone);
   }
 
-  /** La primera lista devuelta es la que Google crea por defecto ("My Tasks"). */
+  /** The first list returned is the one Google creates by default ("My Tasks"). */
   async listLists(): Promise<TaskList[]> {
     const raw: tasks_v1.Schema$TaskList[] = [];
     let pageToken: string | undefined;
@@ -37,9 +37,9 @@ export class GoogleTasksAdapter implements TaskReader, TaskWriter {
   }
 
   /**
-   * Cursor sin pérdidas: `<iso>|<id1,id2,...>` con el `updated` máximo visto y los ids de las tareas
-   * con ese instante. `updatedMin` es inclusivo (resolución de ms), así que sólo se omiten las ya vistas
-   * en ese instante; una tarea nueva con el mismo `updated` se entrega igual.
+   * Lossless cursor: `<iso>|<id1,id2,...>` with the highest `updated` seen and the ids of the tasks at
+   * that instant. `updatedMin` is inclusive (ms resolution), so only tasks already seen at that instant are
+   * skipped; a new task with the same `updated` is still delivered.
    */
   async sync(listId: string, cursor: string | null): Promise<SyncResult<TaskChange>> {
     const parsed = this.parseCursor(cursor);
@@ -79,7 +79,7 @@ export class GoogleTasksAdapter implements TaskReader, TaskWriter {
     return { changes, nextCursor: `${maxIso}|${[...atMax].join(',')}`, fullResync: cursor === null };
   }
 
-  /** Acepta también el formato antiguo (ISO sin `|`) como conjunto de ids vacío. */
+  /** Also accepts the legacy format (ISO without `|`) as an empty id set. */
   private parseCursor(cursor: string | null): { iso: string; ms: number; seen: Set<string> } {
     const [iso = EPOCH, ids = ''] = (cursor ?? EPOCH).split('|');
     return { iso, ms: Date.parse(iso), seen: new Set(ids.split(',').filter(Boolean)) };

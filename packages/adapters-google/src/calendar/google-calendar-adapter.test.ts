@@ -37,8 +37,8 @@ describe('GoogleCalendarAdapter mapping', () => {
       end: { dateTime: '2026-11-24T11:00:00-03:00' },
       attendees: [
         { email: 'me@x.com', self: true, responseStatus: 'tentative' },
-        { email: 'otro@y.com', responseStatus: 'accepted' },
-        { email: 'no es un mail', responseStatus: 'accepted' },
+        { email: 'other@y.com', responseStatus: 'accepted' },
+        { email: 'not an email', responseStatus: 'accepted' },
       ],
       conferenceData: { entryPoints: [{ entryPointType: 'phone', uri: 'tel:1' }, { entryPointType: 'video', uri: 'https://meet/x' }] },
     });
@@ -46,7 +46,7 @@ describe('GoogleCalendarAdapter mapping', () => {
     expect(e!.myResponse).toBe('tentative');
     expect(e!.attendees.map((a) => [a.email.address, a.response, a.self])).toEqual([
       ['me@x.com', 'tentative', true],
-      ['otro@y.com', 'accepted', false],
+      ['other@y.com', 'accepted', false],
     ]);
     expect(e!.videoLink).toBe('https://meet/x');
     expect(e!.htmlLink).toBe('https://cal/b');

@@ -4,7 +4,7 @@ packages:
 allowBuilds:
   "@swc/core": true
   esbuild: true
-  # Dependencias de testcontainers (sólo desarrollo): no necesitan scripts de compilación.
+  # testcontainers dependencies (dev only): they need no build scripts.
   cpu-features: false
   protobufjs: false
   ssh2: false

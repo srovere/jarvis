@@ -5,7 +5,7 @@ import type { Credentials } from 'google-auth-library';
 
 const ACCOUNT_ID = /^[a-z0-9][a-z0-9_-]*$/;
 
-/** Almacén de tokens OAuth en disco: un JSON `0600` por cuenta dentro de un directorio `0700`. */
+/** On-disk OAuth token store: one `0600` JSON per account inside a `0700` directory. */
 export class FileTokenStore {
   constructor(private readonly dir: string) {}
 

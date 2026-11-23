@@ -17,9 +17,9 @@ export class CompleteTask {
   async execute(q: { taskId: string; accountId?: string }): Promise<BriefingTask> {
     const account = await selectAccount(this.accounts, q.accountId);
     const existing = await this.tasks.get(account.id, q.taskId);
-    if (!existing || existing.deleted) throw new DomainError(`Tarea no encontrada: ${q.taskId}`);
+    if (!existing || existing.deleted) throw new DomainError(`Task not found: ${q.taskId}`);
     const writer = (await this.registry.forAccount(account)).tasks;
-    if (!writer) throw new DomainError(`La cuenta ${account.id} no soporta tareas`);
+    if (!writer) throw new DomainError(`Account ${account.id} does not support tasks`);
 
     const done = await writer.completeTask(existing.listId, existing.id);
     await this.tasks.applyChanges(account.id, existing.listId, [{ kind: 'upsert', task: done }]);
