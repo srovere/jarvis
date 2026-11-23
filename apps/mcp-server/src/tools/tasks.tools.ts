@@ -1,0 +1,94 @@
+import { TOKENS, type CompleteTask, type CreateTask, type ListTasks } from '@jarvis/core';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { Inject, Injectable } from '@nestjs/common';
+import { z } from 'zod';
+import { section, taskLine } from './format';
+import { briefingTaskSchema } from './schemas';
+import type { ToolGroup } from './tool-group';
+import { ToolRunner } from './tool-runner';
+
+const STATUS_TITLES = { open: 'Tareas pendientes', completed: 'Tareas completadas', all: 'Tareas' } as const;
+
+/** `list_tasks`, `create_task`, `complete_task`. */
+@Injectable()
+export class TasksTools implements ToolGroup {
+  constructor(
+    @Inject(TOKENS.ListTasks) private readonly list: Pick<ListTasks, 'execute'>,
+    @Inject(TOKENS.CreateTask) private readonly create: Pick<CreateTask, 'execute'>,
+    @Inject(TOKENS.CompleteTask) private readonly complete: Pick<CompleteTask, 'execute'>,
+    private readonly runner: ToolRunner,
+  ) {}
+
+  register(server: McpServer): void {
+    this.registerList(server);
+    this.registerCreate(server);
+    this.registerComplete(server);
+  }
+
+  private registerList(server: McpServer): void {
+    server.registerTool(
+      'list_tasks',
+      {
+        title: 'List tasks',
+        description:
+          "List the user's tasks across every active account, by status (open by default). Use it when the user " +
+          'asks what is pending or done, or to find the id of a task to complete. Based on the last sync.',
+        inputSchema: {
+          status: z.enum(['open', 'completed', 'all']).default('open').describe('Which tasks to list.'),
+        },
+        outputSchema: { tasks: z.array(briefingTaskSchema) },
+      },
+      ({ status }) =>
+        this.runner.run('list_tasks', async () => {
+          const tasks = await this.list.execute({ status });
+          return { text: section(STATUS_TITLES[status], tasks.map(taskLine), 'tareas'), structured: { tasks } };
+        }),
+    );
+  }
+
+  private registerCreate(server: McpServer): void {
+    server.registerTool(
+      'create_task',
+      {
+        title: 'Create task',
+        description:
+          'Create a task in the default task list of the first active account. Use it when the user asks to ' +
+          'remember or track something to do.',
+        inputSchema: {
+          title: z.string().min(1).describe('Task title.'),
+          notes: z.string().optional().describe('Optional details.'),
+          due: z.iso.date().optional().describe('Due date, YYYY-MM-DD.'),
+        },
+        outputSchema: briefingTaskSchema.shape,
+      },
+      ({ title, notes, due }) =>
+        this.runner.run('create_task', async () => {
+          const task = await this.create.execute({
+            title,
+            ...(notes !== undefined ? { notes } : {}),
+            ...(due !== undefined ? { due } : {}),
+          });
+          return { text: `Tarea creada:\n${taskLine(task)}`, structured: task };
+        }),
+    );
+  }
+
+  private registerComplete(server: McpServer): void {
+    server.registerTool(
+      'complete_task',
+      {
+        title: 'Complete task',
+        description:
+          'Mark a task as completed, by the task id returned by list_tasks or get_daily_briefing. Use it when the ' +
+          'user says a task is done. Without an account selection it searches the task in the first active account.',
+        inputSchema: { task_id: z.string().min(1).describe('Task id.') },
+        outputSchema: briefingTaskSchema.shape,
+      },
+      ({ task_id }) =>
+        this.runner.run('complete_task', async () => {
+          const task = await this.complete.execute({ taskId: task_id });
+          return { text: `Tarea completada:\n${taskLine(task)}`, structured: task };
+        }),
+    );
+  }
+}

@@ -1,0 +1,51 @@
+# Copiar a jarvis.config.yaml (git-ignorado). Todas las claves son opcionales;
+# los valores mostrados son los predeterminados.
+# Cualquier clave escalar o lista simple puede sobrescribirse por entorno con
+# JARVIS__SECCION__CLAVE (sin distinguir mayúsculas), p. ej. JARVIS__SYNC__INTERVALMINUTES=10.
+
+# Zona horaria IANA.
+timezone: America/Argentina/Buenos_Aires
+
+# Horario laboral: horas 0..24 (startHour < endHour); días ISO (1 = lunes ... 7 = domingo).
+workSchedule:
+  startHour: 9
+  endHour: 19
+  workDays: [1, 2, 3, 4, 5]
+
+# Bloques de foco.
+focus:
+  titlePrefix: "[Focus] "
+  horizonWorkDays: 5 # horizonte en días hábiles
+  defaultDurationMinutes: 90
+
+# Sincronización.
+sync:
+  intervalMinutes: 5
+  gmailInitialWindowDays: 90
+
+# Resumen diario.
+briefing:
+  maxPriorityEmails: 10
+
+# Correo.
+email:
+  maxBodyChars: 4000
+
+# Servidor MCP (publicar sólo en 127.0.0.1).
+mcp:
+  bind: 127.0.0.1
+  port: 3002
+  tokenFile: /run/secrets/mcp_token
+
+# Directorios de secretos y datos.
+secretsDir: /run/secrets
+dataDir: /data
+
+# Cuentas conectadas. `id` en minúsculas (a-z, 0-9, _ y -), único.
+# `calendars`: ids de calendarios que cuentan como ocupado (por defecto, el principal).
+accounts: []
+# accounts:
+#   - id: personal
+#     provider: google
+#     email: persona@example.com
+#     calendars: [primary]

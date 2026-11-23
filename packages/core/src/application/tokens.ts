@@ -1,0 +1,28 @@
+/** Injection tokens for the ports, services and use cases the apps resolve from their composition root. */
+export const TOKENS = {
+  Clock: Symbol('Clock'),
+  AccountRepository: Symbol('AccountRepository'),
+  SyncStateRepository: Symbol('SyncStateRepository'),
+  MailRepository: Symbol('MailRepository'),
+  EventRepository: Symbol('EventRepository'),
+  TaskRepository: Symbol('TaskRepository'),
+  PersonLinkLookup: Symbol('PersonLinkLookup'),
+  ProviderRegistry: Symbol('ProviderRegistry'),
+  EmailCleaner: Symbol('EmailCleaner'),
+  FreeSlotFinder: Symbol('FreeSlotFinder'),
+  PriorityRules: Symbol('PriorityRules'),
+  FocusSlotSearch: Symbol('FocusSlotSearch'),
+  AppSettings: Symbol('AppSettings'),
+  SyncAccount: Symbol('SyncAccount'),
+  SearchEmails: Symbol('SearchEmails'),
+  ReadThread: Symbol('ReadThread'),
+  GetDailyBriefing: Symbol('GetDailyBriefing'),
+  ListEvents: Symbol('ListEvents'),
+  ListTasks: Symbol('ListTasks'),
+  FindFreeSlot: Symbol('FindFreeSlot'),
+  BlockFocusTime: Symbol('BlockFocusTime'),
+  CreateDraft: Symbol('CreateDraft'),
+  CreateTask: Symbol('CreateTask'),
+  CompleteTask: Symbol('CompleteTask'),
+} as const;
+
