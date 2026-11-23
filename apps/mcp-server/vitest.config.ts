@@ -1,7 +1,9 @@
-import swc from 'unplugin-swc';
-import { defineConfig } from 'vitest/config';
+import { defineConfig, mergeConfig } from 'vitest/config';
+import { sharedConfig } from '../../vitest.shared';
 
-export default defineConfig({
-  plugins: [swc.vite({ module: { type: 'es6' } })],
-  test: { include: ['src/**/*.test.ts'] },
-});
+export default mergeConfig(
+  sharedConfig,
+  defineConfig({
+    test: { include: ['src/**/*.test.ts'] },
+  }),
+);
