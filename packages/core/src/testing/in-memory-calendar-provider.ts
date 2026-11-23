@@ -1,4 +1,3 @@
-import { CursorExpired } from '../domain/errors';
 import type { CalendarEvent } from '../domain/model/calendar';
 import type { TimeRange } from '../domain/model/time-range';
 import type { CalendarReader, EventChange, EventWriter, NewEvent } from '../domain/ports/calendar';
@@ -41,15 +40,17 @@ export class InMemoryCalendarProvider implements CalendarReader, EventWriter {
   }
 
   async sync(calendarId: string, cursor: string | null): Promise<SyncResult<EventChange>> {
-    const nextCursor = this.log.currentCursor;
-    if (cursor === null) {
-      const changes = [...this.events.values()]
+    return this.log.sync(cursor, (k) => k === calendarId, () =>
+      [...this.events.values()]
         .filter((e) => e.calendarId === calendarId)
-        .map((event): EventChange => ({ kind: 'upsert', event }));
-      return { changes, nextCursor, fullResync: true };
+        .map((event): EventChange => ({ kind: 'upsert', event })),
+    );
+  }
+
+  removeEvent(calendarId: string, eventId: string): void {
+    if (this.events.delete(`${calendarId}:${eventId}`)) {
+      this.log.record(calendarId, { kind: 'delete', eventId, calendarId });
     }
-    if (!/^\d+$/.test(cursor)) throw new CursorExpired(`Invalid cursor: ${cursor}`);
-    return { changes: this.log.since(cursor, (k) => k === calendarId), nextCursor, fullResync: false };
   }
 
   async createEvent(e: NewEvent): Promise<{ id: string; htmlLink?: string }> {

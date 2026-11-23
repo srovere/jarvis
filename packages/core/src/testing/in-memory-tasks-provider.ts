@@ -1,4 +1,4 @@
-import { CursorExpired, DomainError } from '../domain/errors';
+import { DomainError } from '../domain/errors';
 import type { Task, TaskList } from '../domain/model/tasks';
 import type { Clock } from '../domain/ports/clock';
 import type { SyncResult } from '../domain/ports/mail';
@@ -29,15 +29,15 @@ export class InMemoryTasksProvider implements TaskReader, TaskWriter {
   }
 
   async sync(listId: string, cursor: string | null): Promise<SyncResult<TaskChange>> {
-    const nextCursor = this.log.currentCursor;
-    if (cursor === null) {
-      const changes = [...this.tasks.values()]
+    return this.log.sync(cursor, (k) => k === listId, () =>
+      [...this.tasks.values()]
         .filter((t) => t.listId === listId)
-        .map((task): TaskChange => ({ kind: 'upsert', task }));
-      return { changes, nextCursor, fullResync: true };
-    }
-    if (!/^\d+$/.test(cursor)) throw new CursorExpired(`Invalid cursor: ${cursor}`);
-    return { changes: this.log.since(cursor, (k) => k === listId), nextCursor, fullResync: false };
+        .map((task): TaskChange => ({ kind: 'upsert', task })),
+    );
+  }
+
+  removeTask(listId: string, taskId: string): void {
+    if (this.tasks.delete(`${listId}:${taskId}`)) this.log.record(listId, { kind: 'delete', taskId });
   }
 
   async createTask(listId: string, t: { title: string; notes?: string; due?: DateTime }): Promise<Task> {

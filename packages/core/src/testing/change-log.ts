@@ -1,3 +1,6 @@
+import { CursorExpired } from '../domain/errors';
+import type { SyncResult } from '../domain/ports/mail';
+
 /** Monotonic versioned log; the cursor handed to callers is the version as a string. */
 export class ChangeLog<K, C> {
   private version = 0;
@@ -11,8 +14,13 @@ export class ChangeLog<K, C> {
     return String(this.version);
   }
 
-  since(cursor: string, match: (key: K) => boolean): C[] {
+  /** `null` cursor: full resync from `snapshot`; otherwise the matching changes after the cursor version. */
+  sync(cursor: string | null, match: (key: K) => boolean, snapshot: () => C[]): SyncResult<C> {
+    const nextCursor = this.currentCursor;
+    if (cursor === null) return { changes: snapshot(), nextCursor, fullResync: true };
+    if (!/^\d+$/.test(cursor)) throw new CursorExpired(`Invalid cursor: ${cursor}`);
     const after = Number(cursor);
-    return this.entries.filter((e) => e.version > after && match(e.key)).map((e) => e.change);
+    const changes = this.entries.filter((e) => e.version > after && match(e.key)).map((e) => e.change);
+    return { changes, nextCursor, fullResync: false };
   }
 }

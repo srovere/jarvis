@@ -1,4 +1,4 @@
-import { DomainError, CursorExpired } from '../domain/errors';
+import { DomainError } from '../domain/errors';
 import type { EmailAddress } from '../domain/model/email-address';
 import type { MailThread, MailThreadSummary } from '../domain/model/mail';
 import type { IdentityProvider } from '../domain/ports/identity';
@@ -24,8 +24,24 @@ export class InMemoryMailProvider implements MailReader, DraftWriter, IdentityPr
 
   seed(threads: MailThread[]): void {
     for (const t of threads) {
+      if (t.messages.length === 0) throw new DomainError(`Thread has no messages: ${t.id}`);
+      const kept = new Set(t.messages.map((m) => m.id));
+      for (const old of this.threads.get(t.id)?.messages ?? []) {
+        if (!kept.has(old.id)) this.log.record(null, { kind: 'delete', messageId: old.id });
+      }
       this.threads.set(t.id, t);
       for (const message of t.messages) this.log.record(null, { kind: 'upsert', message });
+    }
+  }
+
+  removeMessage(messageId: string): void {
+    for (const t of this.threads.values()) {
+      if (!t.messages.some((m) => m.id === messageId)) continue;
+      const messages = t.messages.filter((m) => m.id !== messageId);
+      if (messages.length === 0) this.threads.delete(t.id);
+      else this.threads.set(t.id, { ...t, messages });
+      this.log.record(null, { kind: 'delete', messageId });
+      return;
     }
   }
 
@@ -49,15 +65,9 @@ export class InMemoryMailProvider implements MailReader, DraftWriter, IdentityPr
   }
 
   async sync(cursor: string | null): Promise<SyncResult<MailChange>> {
-    const nextCursor = this.log.currentCursor;
-    if (cursor === null) {
-      const changes = [...this.threads.values()].flatMap((t) =>
-        t.messages.map((message): MailChange => ({ kind: 'upsert', message })),
-      );
-      return { changes, nextCursor, fullResync: true };
-    }
-    if (!/^\d+$/.test(cursor)) throw new CursorExpired(`Invalid cursor: ${cursor}`);
-    return { changes: this.log.since(cursor, () => true), nextCursor, fullResync: false };
+    return this.log.sync(cursor, () => true, () =>
+      [...this.threads.values()].flatMap((t) => t.messages.map((message): MailChange => ({ kind: 'upsert', message }))),
+    );
   }
 
   async createDraft(r: DraftRequest): Promise<DraftRef> {
