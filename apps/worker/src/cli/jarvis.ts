@@ -1,9 +1,11 @@
 import 'reflect-metadata';
-import { join, dirname, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { FileTokenStore, GoogleOAuthFlow } from '@jarvis/adapters-google';
 import { closeDb, createDb, runMigrations } from '@jarvis/adapters-persistence';
 import {
   authPaths,
+  defaultConfigPath,
+  JsonLogger,
   requireDatabaseUrl,
   stderrLogSink,
   type AuthPaths,
@@ -13,7 +15,6 @@ import { loadConfig, type JarvisConfig } from '@jarvis/config';
 import { NestFactory } from '@nestjs/core';
 import { Command } from 'commander';
 import { AccountSyncRunner, type AccountSyncOutcome } from '../account-sync-runner';
-import { JsonLogger } from '../json-logger';
 import { SyncModule } from '../sync.module';
 
 export type { AuthPaths };
@@ -116,11 +117,6 @@ function fail(deps: CliDeps, error: unknown): never {
 /** The account's sync aborted, or one of its resources failed. */
 function failed(o: AccountSyncOutcome): boolean {
   return o.error !== undefined || Object.values(o.result?.resources ?? {}).includes('error');
-}
-
-export function defaultConfigPath(env: NodeJS.ProcessEnv, cwd: string): string {
-  // `pnpm jarvis` corre con cwd en apps/worker; INIT_CWD es el directorio desde el que se invocó pnpm.
-  return env.JARVIS_CONFIG ?? join(env.INIT_CWD ?? cwd, 'jarvis.config.yaml');
 }
 
 export function defaultDeps(): CliDeps {

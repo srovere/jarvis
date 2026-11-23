@@ -1,7 +1,10 @@
-import type { LogSink } from '@jarvis/composition';
 import type { LoggerService } from '@nestjs/common';
+import type { LogSink } from './tokens';
 
 type Level = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'verbose';
+
+/** A stack trace: a first line followed by indented `at` frames. */
+const STACK = /\n\s+at /;
 
 /** Nest logger writing one JSON object per line to a sink (stderr in production; stdout stays clean). */
 export class JsonLogger implements LoggerService {
@@ -31,10 +34,16 @@ export class JsonLogger implements LoggerService {
     this.write('verbose', message, params);
   }
 
-  /** Nest passes `(message, context?)`, or `(message, stack?, context?)` for errors. */
+  /**
+   * Nest passes `(message, context?)`, or `(message, stack?, context?)` for errors; a lone error parameter is the
+   * stack when it looks like one, otherwise the context.
+   */
   private write(level: Level, message: unknown, params: unknown[]): void {
-    const context = params.length > 0 && typeof params.at(-1) === 'string' ? (params.at(-1) as string) : undefined;
-    const stack = (level === 'error' || level === 'fatal') && params.length > 1 ? params[0] : undefined;
+    const isError = level === 'error' || level === 'fatal';
+    const loneStack = isError && params.length === 1 && typeof params[0] === 'string' && STACK.test(params[0]);
+    const last = params.at(-1);
+    const context = !loneStack && typeof last === 'string' ? last : undefined;
+    const stack = loneStack || (isError && params.length > 1) ? params[0] : undefined;
     const msg = message instanceof Error ? message.message : message;
     this.sink(
       JSON.stringify({

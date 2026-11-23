@@ -1,11 +1,9 @@
 import 'reflect-metadata';
 import { dirname, resolve } from 'node:path';
-import { requireDatabaseUrl, stderrLogSink } from '@jarvis/composition';
+import { defaultConfigPath, JsonLogger, requireDatabaseUrl, stderrLogSink } from '@jarvis/composition';
 import { loadConfig } from '@jarvis/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { defaultConfigPath } from './cli/jarvis';
-import { JsonLogger } from './json-logger';
 
 async function bootstrap(): Promise<void> {
   const path = resolve(defaultConfigPath(process.env, process.cwd()));

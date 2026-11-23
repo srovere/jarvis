@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import type { JarvisConfig } from '@jarvis/config';
 import { describe, expect, it, vi } from 'vitest';
-import { buildProgram, defaultConfigPath, type CliDeps } from './jarvis';
+import { buildProgram, type CliDeps } from './jarvis';
 
 class ExitCalled extends Error {
   constructor(readonly code: number) {
@@ -170,13 +170,5 @@ describe('jarvis sync --once', () => {
     await expect(run('sync')).rejects.toMatchObject({ code: 1 });
     expect(openSync).not.toHaveBeenCalled();
     expect(err.join('\n')).toContain('--once');
-  });
-});
-
-describe('defaultConfigPath', () => {
-  it('prefers JARVIS_CONFIG, then INIT_CWD, then cwd', () => {
-    expect(defaultConfigPath({ JARVIS_CONFIG: '/x/c.yaml', INIT_CWD: '/i' }, '/w')).toBe('/x/c.yaml');
-    expect(defaultConfigPath({ INIT_CWD: '/i' }, '/w')).toBe('/i/jarvis.config.yaml');
-    expect(defaultConfigPath({}, '/w')).toBe('/w/jarvis.config.yaml');
   });
 });
