@@ -83,6 +83,10 @@ export class InMemoryMailRepository implements MailRepository {
       .slice(0, limit);
   }
 
+  async messageIdsSince(accountId: string, since: DateTime): Promise<string[]> {
+    return [...(this.messages.get(accountId)?.values() ?? [])].filter((m) => m.date >= since).map((m) => m.id);
+  }
+
   /** Thread summaries for an account, newest first. */
   private summaries(accountId: string): MailThreadSummary[] {
     const byThread = new Map<string, MailMessage[]>();
@@ -132,14 +136,21 @@ export class InMemoryEventRepository implements EventRepository {
       .filter((e) => accountIds.includes(e.accountId) && e.range.overlaps(range))
       .sort((a, b) => a.range.start.toMillis() - b.range.start.toMillis());
   }
+
+  async eventIdsFrom(accountId: string, calendarId: string, from: DateTime): Promise<string[]> {
+    const prefix = `${accountId}|${calendarId}|`;
+    return [...this.events.entries()]
+      .filter(([key, e]) => key.startsWith(prefix) && e.range.start >= from)
+      .map(([, e]) => e.id);
+  }
 }
 
 export class InMemoryTaskRepository implements TaskRepository {
-  private readonly lists = new Map<string, TaskList>();
+  private readonly taskLists = new Map<string, TaskList>();
   private readonly tasks = new Map<string, Task>();
 
   async upsertLists(accountId: string, lists: TaskList[]): Promise<void> {
-    for (const l of lists) this.lists.set(`${accountId}|${l.id}`, l);
+    for (const l of lists) this.taskLists.set(`${accountId}|${l.id}`, l);
   }
 
   async applyChanges(accountId: string, listId: string, changes: TaskChange[]): Promise<void> {
@@ -158,6 +169,21 @@ export class InMemoryTaskRepository implements TaskRepository {
         !t.deleted &&
         (q.dueBefore === undefined || (t.due !== undefined && t.due < q.dueBefore)),
     );
+  }
+
+  async completed(q: { accountIds: string[] }): Promise<Task[]> {
+    return [...this.tasks.values()].filter(
+      (t) => q.accountIds.includes(t.accountId) && t.status === 'completed' && !t.deleted,
+    );
+  }
+
+  async taskIds(accountId: string, listId: string): Promise<string[]> {
+    const prefix = `${accountId}|${listId}|`;
+    return [...this.tasks.entries()].filter(([key]) => key.startsWith(prefix)).map(([, t]) => t.id);
+  }
+
+  async lists(accountIds: string[]): Promise<TaskList[]> {
+    return [...this.taskLists.values()].filter((l) => accountIds.includes(l.accountId));
   }
 }
 

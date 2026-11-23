@@ -119,4 +119,10 @@ describe('DrizzleMailRepository', () => {
     await repo.applyChanges('personal', [up(msg('m1', 'th1', ana, 0))]);
     expect(await repo.recentThreads('work', { since: t0.minus({ days: 1 }), limit: 10 })).toEqual([]);
   });
+
+  it('messageIdsSince returns the account message ids dated at or after since', async () => {
+    await repo.applyChanges('personal', [up(msg('old', 'th1', ana, -60)), up(msg('edge', 'th1', ana, 0)), up(msg('new', 'th2', ana, 30))]);
+    expect((await repo.messageIdsSince('personal', t0)).sort()).toEqual(['edge', 'new']);
+    expect(await repo.messageIdsSince('other', t0)).toEqual([]);
+  });
 });

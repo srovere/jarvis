@@ -97,4 +97,15 @@ describe('DrizzleEventRepository', () => {
     await repo.applyChanges('personal', [{ kind: 'delete', eventId: 'same', calendarId: 'primary' }]);
     expect((await repo.inRange(['personal'], range)).map((e) => e.calendarId)).toEqual(['shared']);
   });
+
+  it('eventIdsFrom returns ids of the calendar events starting at or after from', async () => {
+    await repo.applyChanges('personal', [
+      { kind: 'upsert', event: ev('before', '2026-11-22T09:00:00Z', '2026-11-23T11:00:00Z') },
+      { kind: 'upsert', event: ev('edge', '2026-11-23T10:00:00Z', '2026-11-23T11:00:00Z') },
+      { kind: 'upsert', event: ev('after', '2026-11-24T10:00:00Z', '2026-11-24T11:00:00Z') },
+      { kind: 'upsert', event: ev('othercal', '2026-11-24T10:00:00Z', '2026-11-24T11:00:00Z', { calendarId: 'team' }) },
+    ]);
+    await repo.applyChanges('work', [{ kind: 'upsert', event: ev('work', '2026-11-24T10:00:00Z', '2026-11-24T11:00:00Z', { accountId: 'work' }) }]);
+    expect((await repo.eventIdsFrom('personal', 'primary', at('2026-11-23T10:00:00Z'))).sort()).toEqual(['after', 'edge']);
+  });
 });

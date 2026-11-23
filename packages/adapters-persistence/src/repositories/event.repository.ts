@@ -1,5 +1,6 @@
 import { TimeRange, type CalendarEvent, type EventChange, type EventRepository } from '@jarvis/core';
-import { and, asc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, inArray, lt, sql } from 'drizzle-orm';
+import type { DateTime } from 'luxon';
 import type { Db } from '../db';
 import { fromDate, fromStoredAddress, toDate, toStoredAddress } from '../mappers';
 import { calendars, events } from '../schema';
@@ -33,6 +34,17 @@ export class DrizzleEventRepository implements EventRepository {
       )
       .orderBy(asc(events.startsAt));
     return rows.map((r) => toEvent(r.event, r.calendarExternalId));
+  }
+
+  async eventIdsFrom(accountId: string, calendarId: string, from: DateTime): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: events.externalId })
+      .from(events)
+      .innerJoin(calendars, eq(events.calendarId, calendars.id))
+      .where(
+        and(eq(events.accountId, accountId), eq(calendars.externalId, calendarId), gte(events.startsAt, toDate(from))),
+      );
+    return rows.map((r) => r.id);
   }
 
   private async upsert(tx: Tx, accountId: string, e: CalendarEvent): Promise<void> {

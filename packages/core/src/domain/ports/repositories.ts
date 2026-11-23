@@ -26,17 +26,26 @@ export interface MailRepository {
   applyChanges(accountId: string, changes: MailChange[]): Promise<void>;
   recentThreads(accountId: string, q: { since: DateTime; limit: number }): Promise<MailThreadSummary[]>;
   threadsAwaitingReply(accountId: string, own: EmailAddress[], limit: number): Promise<MailThreadSummary[]>;
+  /** External ids of the stored messages dated at or after `since`. */
+  messageIdsSince(accountId: string, since: DateTime): Promise<string[]>;
 }
 
 export interface EventRepository {
   applyChanges(accountId: string, changes: EventChange[]): Promise<void>;
   inRange(accountIds: string[], range: TimeRange): Promise<CalendarEvent[]>;
+  /** External ids of the stored events of a calendar that start at or after `from`. */
+  eventIdsFrom(accountId: string, calendarId: string, from: DateTime): Promise<string[]>;
 }
 
 export interface TaskRepository {
   upsertLists(accountId: string, lists: TaskList[]): Promise<void>;
   applyChanges(accountId: string, listId: string, changes: TaskChange[]): Promise<void>;
   open(q: { accountIds: string[]; dueBefore?: DateTime }): Promise<Task[]>;
+  /** Completed, non-deleted tasks. */
+  completed(q: { accountIds: string[] }): Promise<Task[]>;
+  /** External ids of every stored task of a list (deleted or not). */
+  taskIds(accountId: string, listId: string): Promise<string[]>;
+  lists(accountIds: string[]): Promise<TaskList[]>;
 }
 
 export interface PersonLinkLookup {

@@ -55,6 +55,36 @@ export class DrizzleTaskRepository implements TaskRepository {
     return rows.map((r) => toTask(r.task, r.listExternalId));
   }
 
+  async completed(q: { accountIds: string[] }): Promise<Task[]> {
+    if (q.accountIds.length === 0) return [];
+    const rows = await this.db
+      .select({ task: tasks, listExternalId: taskLists.externalId })
+      .from(tasks)
+      .innerJoin(taskLists, eq(tasks.listId, taskLists.id))
+      .where(and(inArray(tasks.accountId, q.accountIds), eq(tasks.status, 'completed'), eq(tasks.deleted, false)))
+      .orderBy(sql`${tasks.completedAt} desc nulls last`);
+    return rows.map((r) => toTask(r.task, r.listExternalId));
+  }
+
+  async taskIds(accountId: string, listId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: tasks.externalId })
+      .from(tasks)
+      .innerJoin(taskLists, eq(tasks.listId, taskLists.id))
+      .where(and(eq(tasks.accountId, accountId), eq(taskLists.externalId, listId)));
+    return rows.map((r) => r.id);
+  }
+
+  async lists(accountIds: string[]): Promise<TaskList[]> {
+    if (accountIds.length === 0) return [];
+    const rows = await this.db
+      .select()
+      .from(taskLists)
+      .where(inArray(taskLists.accountId, accountIds))
+      .orderBy(asc(taskLists.title));
+    return rows.map((r) => ({ id: r.externalId, accountId: r.accountId, title: r.title, isDefault: r.isDefault }));
+  }
+
   private async upsert(tx: Tx, accountId: string, listId: string, t: Task): Promise<void> {
     const values = {
       listId,

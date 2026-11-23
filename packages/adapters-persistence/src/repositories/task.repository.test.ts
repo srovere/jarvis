@@ -86,4 +86,32 @@ describe('DrizzleTaskRepository', () => {
     const got = await repo.open({ accountIds: ['personal'] });
     expect(got.map((x) => x.listId).sort()).toEqual(['list1', 'list2']);
   });
+
+  it('completed returns completed, non-deleted tasks', async () => {
+    await repo.applyChanges('personal', 'list1', [
+      { kind: 'upsert', task: task('open') },
+      { kind: 'upsert', task: task('done', { status: 'completed', completedAt: at('2026-11-21T10:00:00Z') }) },
+      { kind: 'upsert', task: task('gone', { status: 'completed', deleted: true }) },
+    ]);
+    const got = await repo.completed({ accountIds: ['personal'] });
+    expect(got.map((x) => x.id)).toEqual(['done']);
+    expect(got[0]!.listId).toBe('list1');
+    expect(await repo.completed({ accountIds: [] })).toEqual([]);
+  });
+
+  it('taskIds returns every stored task id of the list', async () => {
+    await repo.applyChanges('personal', 'list1', [
+      { kind: 'upsert', task: task('a') },
+      { kind: 'upsert', task: task('b', { deleted: true }) },
+    ]);
+    await repo.applyChanges('personal', 'list2', [{ kind: 'upsert', task: task('c', { listId: 'list2' }) }]);
+    expect((await repo.taskIds('personal', 'list1')).sort()).toEqual(['a', 'b']);
+    expect(await repo.taskIds('personal', 'missing')).toEqual([]);
+  });
+
+  it('lists returns the stored lists of the given accounts', async () => {
+    expect(await repo.lists(['personal'])).toEqual([{ id: 'list1', accountId: 'personal', title: 'My tasks', isDefault: true }]);
+    expect(await repo.lists([])).toEqual([]);
+    expect(await repo.lists(['other'])).toEqual([]);
+  });
 });

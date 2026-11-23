@@ -49,6 +49,14 @@ export class DrizzleMailRepository implements MailRepository {
     return this.summarize(rows.map((r) => r.thread));
   }
 
+  async messageIdsSince(accountId: string, since: DateTime): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: mailMessages.externalId })
+      .from(mailMessages)
+      .where(and(eq(mailMessages.accountId, accountId), gte(mailMessages.sentAt, toDate(since))));
+    return rows.map((r) => r.id);
+  }
+
   private async upsert(tx: Tx, accountId: string, m: MailMessage): Promise<void> {
     const [previous] = await tx
       .select({ threadId: mailMessages.threadId })

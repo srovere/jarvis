@@ -2,6 +2,7 @@
 const LUXON = ['(^|/)node_modules/luxon/', '(^|/)node_modules/@types/luxon/', '^luxon$'];
 const ZOD = ['(^|/)node_modules/zod/', '^zod$'];
 const TESTS = '\\.test\\.ts$';
+const TEST_FILES = '\\.test(-support)?\\.ts$';
 // Los tests colocados pueden importar el runner.
 const VITEST = ['(^|/)node_modules/vitest/', '(^|/)node_modules/@vitest/', '^vitest(/|$)'];
 const ADAPTER_PKG = ['^packages/adapters-[^/]+/', '^@jarvis/adapters-', '(^|/)node_modules/@jarvis/adapters-'];
@@ -18,11 +19,27 @@ module.exports = {
     },
     {
       name: 'application-only-domain',
-      comment: 'application sólo importa domain/application (más luxon y zod; los tests pueden importar vitest).',
+      comment: 'application sólo importa domain/application (más luxon y zod).',
       severity: 'error',
-      from: { path: '^packages/core/src/application/' },
+      from: { path: '^packages/core/src/application/', pathNot: TEST_FILES },
       to: {
-        pathNot: ['^packages/core/src/domain/', '^packages/core/src/application/', ...LUXON, ...ZOD, ...VITEST],
+        pathNot: ['^packages/core/src/domain/', '^packages/core/src/application/', ...LUXON, ...ZOD],
+      },
+    },
+    {
+      name: 'application-tests-only-domain-and-doubles',
+      comment: 'Los tests de application (y sus *.test-support.ts) además pueden importar vitest y los dobles de core/testing.',
+      severity: 'error',
+      from: { path: '^packages/core/src/application/.*' + TEST_FILES },
+      to: {
+        pathNot: [
+          '^packages/core/src/domain/',
+          '^packages/core/src/application/',
+          '^packages/core/src/testing/',
+          ...LUXON,
+          ...ZOD,
+          ...VITEST,
+        ],
       },
     },
     {
