@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { DomainError } from '../../domain/errors';
 import { FreeSlotFinder } from '../../domain/services/free-slot-finder';
 import { FocusSlotSearch } from '../focus-slot-search';
-import { appSettings, event, UseCaseFixture } from './use-case-fixture.test-support';
+import { appSettings, at, event, UseCaseFixture } from './use-case-fixture.test-support';
 import { BlockFocusTime } from './block-focus-time';
 
 describe('BlockFocusTime', () => {
@@ -68,8 +68,49 @@ describe('BlockFocusTime', () => {
   });
 
   it('respects preferredStartHour and durationMinutes', async () => {
+    f.clock.set(at('2026-11-24T08:00:00'));
     const r = await build().execute({ taskName: 'X', preferredStartHour: 14, durationMinutes: 60 });
-    expect(r).toMatchObject({ status: 'created', start: '2026-11-24T09:00:00.000-03:00' });
+    expect(r).toMatchObject({ status: 'created', start: '2026-11-24T14:00:00.000-03:00', end: '2026-11-24T15:00:00.000-03:00' });
+  });
+
+  describe('idempotency', () => {
+    const providerEvents = async () =>
+      f.providers.get('a1')!.calendar.listEvents(event('x', 'a1', '2026-11-23T00:00:00', '2026-12-31T00:00:00').range, ['primary', 'other']);
+    const seed = (e: ReturnType<typeof event>) => f.repos.events.applyChanges('a1', [{ kind: 'upsert', event: e }]);
+
+    it('(a) is already_exists when the first block filled the last gap of the day', async () => {
+      await seed(event('b', 'a1', '2026-11-24T10:30:00', '2026-11-24T19:00:00'));
+      const first = await build().execute({ taskName: 'X' });
+      expect(first).toMatchObject({ status: 'created', start: '2026-11-24T09:00:00.000-03:00' });
+      const second = await build().execute({ taskName: 'X' });
+      expect(second).toMatchObject({ status: 'already_exists', eventId: 'event-1' });
+      expect(await providerEvents()).toHaveLength(1);
+    });
+
+    it('(b) is already_exists, not no_slot, when the first block filled the last gap of the horizon', async () => {
+      const full = ['24', '25', '26'].map((d) => event(`d${d}`, 'a1', `2026-11-${d}T09:00:00`, `2026-11-${d}T19:00:00`));
+      for (const e of full) await seed(e);
+      await seed(event('d27', 'a1', '2026-11-27T10:30:00', '2026-11-27T19:00:00'));
+      expect(await build().execute({ taskName: 'X' })).toMatchObject({ status: 'created', start: '2026-11-27T09:00:00.000-03:00' });
+      expect(await build().execute({ taskName: 'X' })).toMatchObject({ status: 'already_exists', eventId: 'event-1' });
+    });
+
+    it('(c) a past identical block does not prevent a new one', async () => {
+      f.clock.set(at('2026-11-24T12:00:00'));
+      await seed(event('old', 'a1', '2026-11-24T09:00:00', '2026-11-24T10:30:00', { title: '[Focus] X' }));
+      expect(await build().execute({ taskName: 'X' })).toMatchObject({ status: 'created' });
+    });
+
+    it('(d) cancelled or declined identical events are ignored', async () => {
+      await seed(event('c', 'a1', '2026-11-24T09:00:00', '2026-11-24T10:30:00', { title: '[Focus] X', status: 'cancelled' }));
+      await seed(event('d', 'a1', '2026-11-24T10:30:00', '2026-11-24T12:00:00', { title: '[Focus] X', myResponse: 'declined' }));
+      expect(await build().execute({ taskName: 'X' })).toMatchObject({ status: 'created' });
+    });
+
+    it('(e) an identical event in a non-busy, non-primary calendar is ignored', async () => {
+      await seed(event('o', 'a1', '2026-11-24T09:00:00', '2026-11-24T10:30:00', { title: '[Focus] X', calendarId: 'other' }));
+      expect(await build().execute({ taskName: 'X' })).toMatchObject({ status: 'created' });
+    });
   });
 
   it('rejects an account that needs reauth, and fails without active accounts', async () => {

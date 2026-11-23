@@ -25,7 +25,7 @@ export class FocusSlotSearch {
     const active = await activeAccounts(this.accounts);
     const stored = await this.events.inRange(
       active.map((a) => a.id),
-      new TimeRange(now, this.horizonEnd(now, horizonWorkDays)),
+      this.horizon(),
     );
     const busy = stored.filter((e) => busyCalendarsOf(this.settings, e.accountId).includes(e.calendarId));
     return this.finder.find({
@@ -35,6 +35,12 @@ export class FocusSlotSearch {
       ...(q.preferredStartHour !== undefined ? { preferredStartHour: q.preferredStartHour } : {}),
       horizonWorkDays,
     });
+  }
+
+  /** From now to the end of the last work day the finder may scan. */
+  horizon(): TimeRange {
+    const now = this.clock.now();
+    return new TimeRange(now, this.horizonEnd(now, this.settings.focus.horizonWorkDays));
   }
 
   /** Start of the day after the last work day the finder may scan. */

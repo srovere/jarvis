@@ -1,6 +1,5 @@
 import { DomainError } from '../../domain/errors';
 import type { CalendarEvent } from '../../domain/model/calendar';
-import { TimeRange } from '../../domain/model/time-range';
 import type { AccountRepository, EventRepository } from '../../domain/ports/repositories';
 import { selectAccount } from '../active-accounts';
 import { busyCalendarsOf, type AppSettings } from '../config';
@@ -26,20 +25,23 @@ export class BlockFocusTime {
   async execute(q: { taskName: string; durationMinutes?: number; preferredStartHour?: number; accountId?: string }): Promise<BlockFocusResult> {
     const account = await selectAccount(this.accounts, q.accountId);
     const { zone, focus } = this.settings;
+    const title = `${focus.titlePrefix}${q.taskName}`;
+    const calendars = [...new Set([...busyCalendarsOf(this.settings, account.id), 'primary'])];
+    const horizon = this.slots.horizon();
+    const now = horizon.start;
+    const upcoming = await this.events.inRange([account.id], horizon);
+    const existing = upcoming
+      .filter((e) => e.title === title && calendars.includes(e.calendarId) && isAttended(e) && e.range.end > now)
+      .sort((a, b) => a.range.start.toMillis() - b.range.start.toMillis())[0];
+    if (existing) {
+      return { status: 'already_exists', eventId: existing.id, start: isoIn(existing.range.start, zone), end: isoIn(existing.range.end, zone) };
+    }
+
     const slot = await this.slots.find({
       durationMinutes: q.durationMinutes ?? focus.defaultDurationMinutes,
       ...(q.preferredStartHour !== undefined ? { preferredStartHour: q.preferredStartHour } : {}),
     });
     if (!slot) return { status: 'no_slot', searchedWorkDays: focus.horizonWorkDays };
-
-    const title = `${focus.titlePrefix}${q.taskName}`;
-    const day = slot.start.setZone(zone).startOf('day');
-    const sameDay = await this.events.inRange([account.id], new TimeRange(day, day.plus({ days: 1 })));
-    const calendars = busyCalendarsOf(this.settings, account.id);
-    const existing = sameDay.find((e) => e.title === title && calendars.includes(e.calendarId) && isAttended(e));
-    if (existing) {
-      return { status: 'already_exists', eventId: existing.id, start: isoIn(existing.range.start, zone), end: isoIn(existing.range.end, zone) };
-    }
 
     const calendar = (await this.registry.forAccount(account)).calendar;
     if (!calendar) throw new DomainError(`La cuenta ${account.id} no soporta calendario`);
