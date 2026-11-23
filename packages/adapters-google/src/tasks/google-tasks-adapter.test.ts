@@ -3,9 +3,11 @@ import { DateTime } from 'luxon';
 import { FakeTasks } from './__fixtures__/fake-tasks';
 import { GoogleTasksAdapter } from './google-tasks-adapter';
 
+const ZONE = 'America/Argentina/Buenos_Aires';
+
 function setup(opts: ConstructorParameters<typeof FakeTasks>[0] = {}) {
   const fake = new FakeTasks(opts);
-  return { fake, adapter: new GoogleTasksAdapter(fake.asTasks(), 'acc') };
+  return { fake, adapter: new GoogleTasksAdapter(fake.asTasks(), 'acc', ZONE) };
 }
 
 describe('GoogleTasksAdapter', () => {
@@ -16,7 +18,7 @@ describe('GoogleTasksAdapter', () => {
     expect(lists.map((l) => [l.title, l.isDefault])).toEqual([['My Tasks', true], ['Otra', false]]);
   });
 
-  it('maps due as midnight UTC of the date, completed timestamps and status', async () => {
+  it('maps the date-only due to the start of that date in the zone, completed timestamps and status', async () => {
     const { fake, adapter } = setup();
     const [list] = await adapter.listLists();
     fake.seed(list!.id, {
@@ -30,7 +32,7 @@ describe('GoogleTasksAdapter', () => {
     const c = r.changes[0]!;
     if (c.kind !== 'upsert') throw new Error('expected upsert');
     expect(c.task.status).toBe('completed');
-    expect(c.task.due!.toISO()).toBe('2026-11-24T00:00:00.000Z');
+    expect(c.task.due!.toISO()).toBe('2026-11-24T00:00:00.000-03:00');
     expect(c.task.completedAt!.toMillis()).toBe(Date.parse('2026-11-23T15:30:00.000Z'));
   });
 
@@ -59,7 +61,7 @@ describe('GoogleTasksAdapter', () => {
     expect(fake.calls.tasksList.mock.calls.at(-1)![0].updatedMin).toBe(first.nextCursor.split('|')[0]);
   });
 
-  it('createTask sends due as RFC3339 midnight UTC of the given date', async () => {
+  it('createTask sends due as RFC3339 midnight UTC of its date in the zone', async () => {
     const { fake, adapter } = setup();
     const [list] = await adapter.listLists();
     const due = DateTime.fromISO('2026-12-05T18:00:00', { zone: 'America/Argentina/Buenos_Aires' });
@@ -68,7 +70,14 @@ describe('GoogleTasksAdapter', () => {
       tasklist: list!.id,
       requestBody: { title: 'Pagar', notes: 'n', due: '2026-12-05T00:00:00.000Z' },
     });
-    expect(t.due!.toISO()).toBe('2026-12-05T00:00:00.000Z');
+    expect(t.due!.toISO()).toBe('2026-12-05T00:00:00.000-03:00');
+  });
+
+  it('createTask takes the date in the zone, not the DateTime own zone', async () => {
+    const { fake, adapter } = setup();
+    const [list] = await adapter.listLists();
+    await adapter.createTask(list!.id, { title: 'Tarde', due: DateTime.fromISO('2026-12-06T01:00:00Z', { zone: 'utc' }) });
+    expect(fake.calls.tasksInsert.mock.calls[0]![0].requestBody.due).toBe('2026-12-05T00:00:00.000Z');
   });
 
   it('completeTask patches status completed', async () => {

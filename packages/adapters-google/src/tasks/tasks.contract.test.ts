@@ -3,6 +3,6 @@ import { FakeTasks } from './__fixtures__/fake-tasks';
 import { GoogleTasksAdapter } from './google-tasks-adapter';
 
 describeTasksContract('GoogleTasksAdapter + FakeTasks', async () => {
-  const adapter = new GoogleTasksAdapter(new FakeTasks({ pageSize: 1 }).asTasks(), 'contract-account');
+  const adapter = new GoogleTasksAdapter(new FakeTasks({ pageSize: 1 }).asTasks(), 'contract-account', 'America/Argentina/Buenos_Aires');
   return { reader: adapter, writer: adapter };
 });

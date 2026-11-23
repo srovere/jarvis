@@ -5,6 +5,10 @@ import type { calendar_v3 } from 'googleapis';
 import { callGoogle, isGone } from '../google-errors';
 import { CalendarMapper } from './calendar-mapper';
 
+/**
+ * Ventana del resync completo. Debe coincidir con `CALENDAR_RESYNC_DAYS` de `SyncAccount` (core): esa
+ * reconciliación borra los eventos guardados desde ahí que falten en el snapshot.
+ */
 const INITIAL_WINDOW_DAYS = 30;
 const PAGE_SIZE = 250;
 

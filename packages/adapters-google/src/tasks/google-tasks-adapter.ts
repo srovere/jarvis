@@ -15,8 +15,9 @@ export class GoogleTasksAdapter implements TaskReader, TaskWriter {
   constructor(
     private readonly tasks: tasks_v1.Tasks,
     private readonly accountId: string,
+    private readonly zone: string,
   ) {
-    this.mapper = new TasksMapper(accountId);
+    this.mapper = new TasksMapper(accountId, zone);
   }
 
   /** La primera lista devuelta es la que Google crea por defecto ("My Tasks"). */
@@ -91,7 +92,7 @@ export class GoogleTasksAdapter implements TaskReader, TaskWriter {
         requestBody: {
           title: t.title,
           ...(t.notes !== undefined && { notes: t.notes }),
-          ...(t.due && { due: `${t.due.toISODate()!}T00:00:00.000Z` }),
+          ...(t.due && { due: `${t.due.setZone(this.zone).toISODate()!}T00:00:00.000Z` }),
         },
       }),
     );

@@ -29,7 +29,11 @@ interface SyncUnit {
   run(cursor: string | null): Promise<{ nextCursor: string; fullResync: boolean }>;
 }
 
-/** Window the calendar adapter resyncs from (now − 30 days). */
+/**
+ * Window the calendar adapter resyncs from (now − 30 days). Must equal `INITIAL_WINDOW_DAYS` in
+ * adapters-google `google-calendar-adapter.ts`: a larger value here would delete valid events older than
+ * the adapter's snapshot window.
+ */
 const CALENDAR_RESYNC_DAYS = 30;
 
 /**

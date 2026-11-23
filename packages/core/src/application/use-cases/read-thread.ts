@@ -1,4 +1,4 @@
-import { DomainError } from '../../domain/errors';
+import { ThreadNotFound } from '../../domain/errors';
 import type { Account } from '../../domain/model/account';
 import type { MailThread } from '../../domain/model/mail';
 import type { AccountRepository } from '../../domain/ports/repositories';
@@ -37,20 +37,19 @@ export class ReadThread {
   }
 
   private async findInActiveAccounts(threadId: string): Promise<MailThread> {
-    const notFound = `Thread not found: ${threadId}`;
     for (const account of await activeAccounts(this.accounts)) {
       try {
         return await this.fetch(account, threadId);
       } catch (e) {
-        if (!(e instanceof DomainError && e.message === notFound)) throw e;
+        if (!(e instanceof ThreadNotFound)) throw e;
       }
     }
-    throw new DomainError(notFound);
+    throw new ThreadNotFound(threadId);
   }
 
   private async fetch(account: Account, threadId: string): Promise<MailThread> {
     const mail = (await this.registry.forAccount(account)).mail;
-    if (!mail) throw new DomainError(`Thread not found: ${threadId}`);
+    if (!mail) throw new ThreadNotFound(threadId);
     return mail.getThread(threadId);
   }
 }

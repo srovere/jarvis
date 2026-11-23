@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
-import { DomainError } from '../domain/errors';
+import { DomainError, ThreadNotFound } from '../domain/errors';
 import { EmailAddress } from '../domain/model/email-address';
 import type { MailMessage, MailThread } from '../domain/model/mail';
 import { FixedClock } from './fixed-clock';
@@ -56,8 +56,9 @@ describe('InMemoryMailProvider', () => {
 
   it('getThread throws for a missing thread', async () => {
     await expect(provider(thread([msg('m1', 'a@y.com', ['me@x.com'], 0)])).getThread('zz')).rejects.toThrow(
-      new DomainError('Thread not found: zz'),
+      new ThreadNotFound('zz'),
     );
+    await expect(provider(thread([msg('m1', 'a@y.com', ['me@x.com'], 0)])).getThread('zz')).rejects.toThrow(ThreadNotFound);
   });
 
   it('replies to the last sender and prefixes Re:', async () => {

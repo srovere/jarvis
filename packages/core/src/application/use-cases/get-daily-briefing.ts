@@ -52,13 +52,21 @@ export class GetDailyBriefing {
     };
   }
 
+  /** Live own addresses; on any provider failure falls back to the account address (read-only: no status change). */
+  private async ownAddresses(account: Account): Promise<EmailAddress[]> {
+    try {
+      return await (await this.registry.forAccount(account)).identity.ownAddresses();
+    } catch {
+      return [account.email];
+    }
+  }
+
   private async priorityEmails(active: Account[], day: TimeRange): Promise<BriefingEmail[]> {
     const since = day.start.minus({ days: EMAIL_LOOKBACK_DAYS });
     const candidates: MailThreadSummary[] = [];
     const own: EmailAddress[] = [];
     for (const account of active) {
-      const bundle = await this.registry.forAccount(account);
-      own.push(...(await bundle.identity.ownAddresses()));
+      own.push(...(await this.ownAddresses(account)));
       candidates.push(...(await this.mail.recentThreads(account.id, { since, limit: EMAIL_CANDIDATES_PER_ACCOUNT })));
     }
     const ranked = await this.priority.rank(candidates, own, this.settings.briefing.maxPriorityEmails);

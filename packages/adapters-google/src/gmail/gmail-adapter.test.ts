@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { DomainError, EmailAddress, ReauthRequired } from '@jarvis/core';
+import { DomainError, EmailAddress, ReauthRequired, ThreadNotFound } from '@jarvis/core';
 import { buildMessage, buildThread, T0 } from '@jarvis/contracts';
 import { FakeGmail } from './__fixtures__/fake-gmail';
 import { GmailAdapter } from './gmail-adapter';
@@ -293,6 +293,13 @@ describe('GmailAdapter sync', () => {
 });
 
 describe('GmailAdapter error mapping', () => {
+  it('getThread and a reply draft on a missing thread throw ThreadNotFound', async () => {
+    const { adapter } = setup();
+    await expect(adapter.getThread('zz')).rejects.toThrow(ThreadNotFound);
+    await expect(adapter.getThread('zz')).rejects.toThrow('Thread not found: zz');
+    await expect(adapter.createDraft({ threadId: 'zz', body: 'x' })).rejects.toThrow(ThreadNotFound);
+  });
+
   const invalidGrant = Object.assign(new Error('invalid_grant'), { response: { status: 400, data: { error: 'invalid_grant' } } });
   const failing = (error: unknown) =>
     new GmailAdapter({ users: { getProfile: async () => { throw error; }, settings: { sendAs: { list: async () => { throw error; } } } } } as never, 'acc');

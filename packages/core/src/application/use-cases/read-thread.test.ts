@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { DomainError } from '../../domain/errors';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DomainError, ThreadNotFound } from '../../domain/errors';
 import { appSettings, message, MONDAY_20, thread, UseCaseFixture } from './use-case-fixture.test-support';
 import { ReadThread } from './read-thread';
 
@@ -35,10 +35,21 @@ describe('ReadThread', () => {
   });
 
   it('throws Thread not found when no active account has it', async () => {
-    await expect(useCase().execute({ threadId: 'zz' })).rejects.toThrow(new DomainError('Thread not found: zz'));
+    await expect(useCase().execute({ threadId: 'zz' })).rejects.toThrow(new ThreadNotFound('zz'));
   });
 
   it('with accountId does not fall back to other accounts', async () => {
-    await expect(useCase().execute({ accountId: 'a1', threadId: 'u1' })).rejects.toThrow(new DomainError('Thread not found: u1'));
+    await expect(useCase().execute({ accountId: 'a1', threadId: 'u1' })).rejects.toThrow(new ThreadNotFound('u1'));
+  });
+
+  it('only ThreadNotFound moves on to the next account; other errors propagate', async () => {
+    vi.spyOn(f.providers.get('a1')!.mail, 'getThread').mockRejectedValue(new DomainError('Thread not found: u1'));
+    await expect(useCase().execute({ threadId: 'u1' })).rejects.not.toBeInstanceOf(ThreadNotFound);
+    vi.spyOn(f.providers.get('a1')!.mail, 'getThread').mockRejectedValue(new ThreadNotFound('u1'));
+    expect((await useCase().execute({ threadId: 'u1' })).messages).toHaveLength(2);
+  });
+
+  it('the final error is a ThreadNotFound', async () => {
+    await expect(useCase().execute({ threadId: 'zz' })).rejects.toBeInstanceOf(ThreadNotFound);
   });
 });

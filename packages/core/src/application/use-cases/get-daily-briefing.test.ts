@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailAddress } from '../../domain/model/email-address';
 import { PriorityRules } from '../../domain/services/priority-rules';
 import { GetDailyBriefing } from './get-daily-briefing';
@@ -100,5 +100,24 @@ describe('GetDailyBriefing', () => {
     const b = await useCase().execute({ dateOffsetDays: 1 });
     expect(b.accountsNeedingReauth).toEqual(['a2']);
     expect(b.events).toEqual([]);
+  });
+
+  it('one account failing to report its own addresses still yields both accounts priority emails', async () => {
+    await f.addAccount('a2');
+    vi.spyOn(f.providers.get('a1')!.mail, 'ownAddresses').mockRejectedValue(new Error('network down'));
+    await f.repos.mail.applyChanges('a1', [{ kind: 'upsert', message: message('m1', 't1', 'a1', MONDAY_20.minus({ hours: 1 })) }]);
+    await f.repos.mail.applyChanges('a2', [{ kind: 'upsert', message: message('n1', 'u1', 'a2', MONDAY_20.minus({ hours: 2 })) }]);
+
+    const b = await useCase().execute({ dateOffsetDays: 0 });
+
+    expect(b.priorityEmails.map((e) => e.threadId)).toEqual(['t1', 'u1']);
+    expect((await f.repos.accounts.get('a1')).status).toBe('active');
+  });
+
+  it('a task due on Tuesday (start of day in the zone) is in Tuesday tasksDue, not Monday', async () => {
+    await f.repos.tasks.upsertLists('a1', [{ id: 'l1', accountId: 'a1', title: 'Inbox', isDefault: true }]);
+    await f.repos.tasks.applyChanges('a1', 'l1', [{ kind: 'upsert', task: task('tue', 'a1', { due: at('2026-11-24T00:00:00') }) }]);
+    expect((await useCase().execute({ dateOffsetDays: 0 })).tasksDue).toEqual([]);
+    expect((await useCase().execute({ dateOffsetDays: 1 })).tasksDue.map((t) => t.id)).toEqual(['tue']);
   });
 });

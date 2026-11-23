@@ -32,7 +32,7 @@ export class GoogleProviderFactory implements ProviderFactory {
       mail: gmail,
       identity: gmail,
       calendar: new GoogleCalendarAdapter(google.calendar({ version: 'v3', auth }), account.id, this.zone),
-      tasks: new GoogleTasksAdapter(google.tasks({ version: 'v1', auth }), account.id),
+      tasks: new GoogleTasksAdapter(google.tasks({ version: 'v1', auth }), account.id, this.zone),
       capabilities: { ...GOOGLE_CAPABILITIES },
     };
   }

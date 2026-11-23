@@ -1,4 +1,4 @@
-import { DomainError, EmailAddress } from '@jarvis/core';
+import { DomainError, EmailAddress, ThreadNotFound } from '@jarvis/core';
 import type {
   DraftRef,
   DraftRequest,
@@ -55,7 +55,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     try {
       return this.mapper.toThread(await this.fetchThread(threadId, 'full'));
     } catch (e) {
-      if (isNotFound(e)) throw new DomainError(`Thread not found: ${threadId}`);
+      if (isNotFound(e)) throw new ThreadNotFound(threadId);
       throw e;
     }
   }
@@ -191,7 +191,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     try {
       thread = this.mapper.toThread(await this.fetchThread(threadId, 'metadata', SYNC_HEADERS));
     } catch (e) {
-      if (isNotFound(e)) throw new DomainError(`Thread not found: ${threadId}`);
+      if (isNotFound(e)) throw new ThreadNotFound(threadId);
       throw e;
     }
     const messages = thread.messages.filter((m) => !m.labels.includes('DRAFT'));

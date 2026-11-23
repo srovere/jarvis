@@ -12,3 +12,9 @@ export class ReauthRequired extends DomainError {
   }
 }
 export class CursorExpired extends DomainError {}
+
+export class ThreadNotFound extends DomainError {
+  constructor(public readonly threadId: string) {
+    super(`Thread not found: ${threadId}`);
+  }
+}

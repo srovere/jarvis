@@ -1,4 +1,4 @@
-import { DomainError } from '../domain/errors';
+import { DomainError, ThreadNotFound } from '../domain/errors';
 import type { EmailAddress } from '../domain/model/email-address';
 import type { MailThread, MailThreadSummary } from '../domain/model/mail';
 import type { IdentityProvider } from '../domain/ports/identity';
@@ -60,7 +60,7 @@ export class InMemoryMailProvider implements MailReader, DraftWriter, IdentityPr
 
   async getThread(threadId: string): Promise<MailThread> {
     const t = this.threads.get(threadId);
-    if (!t) throw new DomainError(`Thread not found: ${threadId}`);
+    if (!t) throw new ThreadNotFound(threadId);
     return { ...t, messages: [...t.messages].sort((a, b) => a.date.toMillis() - b.date.toMillis()) };
   }
 
