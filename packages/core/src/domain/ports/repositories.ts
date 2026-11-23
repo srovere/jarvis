@@ -45,6 +45,8 @@ export interface TaskRepository {
   completed(q: { accountIds: string[] }): Promise<Task[]>;
   /** External ids of every stored task of a list (deleted or not). */
   taskIds(accountId: string, listId: string): Promise<string[]>;
+  /** The stored task with this external id in any list of the account (deleted or not), or null. */
+  get(accountId: string, taskId: string): Promise<Task | null>;
   lists(accountIds: string[]): Promise<TaskList[]>;
 }
 

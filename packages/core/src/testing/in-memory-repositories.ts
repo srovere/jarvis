@@ -182,6 +182,10 @@ export class InMemoryTaskRepository implements TaskRepository {
     return [...this.tasks.entries()].filter(([key]) => key.startsWith(prefix)).map(([, t]) => t.id);
   }
 
+  async get(accountId: string, taskId: string): Promise<Task | null> {
+    return [...this.tasks.values()].find((t) => t.accountId === accountId && t.id === taskId) ?? null;
+  }
+
   async lists(accountIds: string[]): Promise<TaskList[]> {
     return [...this.taskLists.values()].filter((l) => accountIds.includes(l.accountId));
   }

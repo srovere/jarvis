@@ -114,4 +114,12 @@ describe('DrizzleTaskRepository', () => {
     expect(await repo.lists([])).toEqual([]);
     expect(await repo.lists(['other'])).toEqual([]);
   });
+
+  it('get finds a task by external id across lists, or null', async () => {
+    await repo.applyChanges('personal', 'list2', [{ kind: 'upsert', task: task('t9', { listId: 'list2', title: 'Nine' }) }]);
+    const got = await repo.get('personal', 't9');
+    expect(got).toMatchObject({ id: 't9', listId: 'list2', title: 'Nine', accountId: 'personal' });
+    expect(await repo.get('personal', 'nope')).toBeNull();
+    expect(await repo.get('other', 't9')).toBeNull();
+  });
 });
