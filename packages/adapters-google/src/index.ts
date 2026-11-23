@@ -4,3 +4,6 @@ export * from './oauth/google-oauth-flow';
 export * from './gmail/gmail-adapter';
 export * from './gmail/mime-builder';
 export * from './html-to-text';
+export * from './calendar/google-calendar-adapter';
+export * from './tasks/google-tasks-adapter';
+export * from './google-provider-factory';

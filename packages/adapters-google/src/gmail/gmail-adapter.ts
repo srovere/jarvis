@@ -1,4 +1,4 @@
-import { DomainError, EmailAddress, ReauthRequired } from '@jarvis/core';
+import { DomainError, EmailAddress } from '@jarvis/core';
 import type {
   DraftRef,
   DraftRequest,
@@ -12,6 +12,7 @@ import type {
   SyncResult,
 } from '@jarvis/core';
 import type { gmail_v1 } from 'googleapis';
+import { callGoogle, isNotFound } from '../google-errors';
 import { GmailMapper } from './gmail-mapper';
 import { buildMime } from './mime-builder';
 
@@ -23,25 +24,6 @@ const FETCH_BATCH = 10;
 /** Mensajes con estas etiquetas no se sincronizan ni sirven de ancla para responder (DRAFT). */
 const EXCLUDED_LABELS = ['DRAFT', 'TRASH', 'SPAM'];
 const isExcluded = (m: { labels: string[] }): boolean => m.labels.some((l) => EXCLUDED_LABELS.includes(l));
-
-interface ApiError {
-  code?: unknown;
-  status?: unknown;
-  message?: unknown;
-  response?: { status?: unknown; data?: { error?: unknown } };
-}
-
-const asApiError = (e: unknown): ApiError => (typeof e === 'object' && e !== null ? (e as ApiError) : {});
-
-function isNotFound(e: unknown): boolean {
-  const err = asApiError(e);
-  return err.code === 404 || err.status === 404 || err.response?.status === 404;
-}
-
-function isInvalidGrant(e: unknown): boolean {
-  const err = asApiError(e);
-  return err.response?.data?.error === 'invalid_grant' || err.code === 'invalid_grant' || err.message === 'invalid_grant';
-}
 
 /**
  * Gmail como `MailReader`, `DraftWriter` e `IdentityProvider`.
@@ -228,14 +210,8 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     return this.sendAs;
   }
 
-  /** Desenvuelve `data` y traduce `invalid_grant` a `ReauthRequired`; el resto de errores se propaga. */
-  private async call<T>(request: () => Promise<{ data: T }>): Promise<T> {
-    try {
-      return (await request()).data;
-    } catch (e) {
-      if (isInvalidGrant(e)) throw new ReauthRequired(this.accountId);
-      throw e;
-    }
+  private call<T>(request: () => Promise<{ data: T }>): Promise<T> {
+    return callGoogle(this.accountId, request);
   }
 
   private async inBatches<I, O>(items: I[], fn: (item: I) => Promise<O>): Promise<O[]> {
