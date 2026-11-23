@@ -1,0 +1,15 @@
+# Copiar a jarvis.config.yaml (git-ignorado).
+timezone: America/Argentina/Buenos_Aires
+workingHours:
+  start: "09:00"
+  end: "19:00"
+  days: [1, 2, 3, 4, 5] # ISO: 1 = lunes
+focus:
+  prefix: "[Focus] "
+  horizonBusinessDays: 5
+sync:
+  intervalMinutes: 5
+  gmailInitialWindowDays: 90
+briefing:
+  maxPriorityEmails: 10
+accounts: []
