@@ -45,10 +45,11 @@ module.exports = {
     {
       name: 'adapters-only-from-composition-roots',
       comment:
-        'Sólo las raíces de composición (apps/*/src/**/*.module.ts, apps/*/src/cli/**) y sus tests importan adaptadores; un adaptador puede importar su propio paquete.',
+        'Sólo las raíces de composición (packages/composition, apps/*/src/**/*.module.ts, apps/*/src/cli/**) y sus tests importan adaptadores; un adaptador puede importar su propio paquete.',
       severity: 'error',
       from: {
         pathNot: [
+          '^packages/composition/src/',
           '^apps/[^/]+/src/.*\\.module\\.ts$',
           '^apps/[^/]+/src/cli/',
           '^apps/[^/]+/src/.*' + TESTS,
@@ -63,6 +64,13 @@ module.exports = {
       severity: 'error',
       from: { path: '^packages/(adapters-[^/]+)/' },
       to: { path: ADAPTER_PKG, pathNot: '^packages/$1/' },
+    },
+    {
+      name: 'composition-only-from-apps',
+      comment: 'La raíz de composición compartida (packages/composition) sólo la importan las apps.',
+      severity: 'error',
+      from: { path: '^packages/', pathNot: '^packages/composition/' },
+      to: { path: ['^packages/composition/', '^@jarvis/composition', '(^|/)node_modules/@jarvis/composition'] },
     },
     {
       name: 'adapters-not-apps',
