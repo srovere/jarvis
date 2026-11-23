@@ -86,4 +86,15 @@ describe('DrizzleEventRepository', () => {
     expect(await repo.inRange(['work'], range)).toEqual([]);
     expect(await repo.inRange([], range)).toEqual([]);
   });
+
+  it('keeps the same event id in two calendars as separate rows and deletes per calendar', async () => {
+    const a = ev('same', '2026-11-23T10:00:00Z', '2026-11-23T11:00:00Z', { calendarId: 'primary' });
+    const b = ev('same', '2026-11-23T10:00:00Z', '2026-11-23T11:00:00Z', { calendarId: 'shared' });
+    await repo.applyChanges('personal', [{ kind: 'upsert', event: a }, { kind: 'upsert', event: b }]);
+    await repo.applyChanges('personal', [{ kind: 'upsert', event: a }, { kind: 'upsert', event: b }]);
+    const range = new TimeRange(at('2026-11-23T00:00:00Z'), at('2026-11-24T00:00:00Z'));
+    expect((await repo.inRange(['personal'], range)).map((e) => e.calendarId).sort()).toEqual(['primary', 'shared']);
+    await repo.applyChanges('personal', [{ kind: 'delete', eventId: 'same', calendarId: 'primary' }]);
+    expect((await repo.inRange(['personal'], range)).map((e) => e.calendarId)).toEqual(['shared']);
+  });
 });

@@ -37,7 +37,7 @@ CREATE TABLE "events" (
 	"raw" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "events_account_external_uq" UNIQUE("account_id","external_id")
+	CONSTRAINT "events_account_calendar_external_uq" UNIQUE("account_id","calendar_id","external_id")
 );
 --> statement-breakpoint
 CREATE TABLE "mail_messages" (
@@ -113,7 +113,7 @@ CREATE TABLE "tasks" (
 	"raw" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "tasks_account_external_uq" UNIQUE("account_id","external_id")
+	CONSTRAINT "tasks_account_list_external_uq" UNIQUE("account_id","list_id","external_id")
 );
 --> statement-breakpoint
 ALTER TABLE "calendars" ADD CONSTRAINT "calendars_account_id_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."accounts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

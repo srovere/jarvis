@@ -36,7 +36,7 @@ export class DrizzleMailRepository implements MailRepository {
       .selectDistinctOn([mailMessages.threadId], { threadId: mailMessages.threadId, from: mailMessages.fromAddress })
       .from(mailMessages)
       .where(eq(mailMessages.accountId, accountId))
-      .orderBy(mailMessages.threadId, desc(mailMessages.sentAt))
+      .orderBy(mailMessages.threadId, desc(mailMessages.sentAt), desc(mailMessages.id))
       .as('last_message');
     const ownAddresses = own.map((o) => o.address);
     const rows = await this.db

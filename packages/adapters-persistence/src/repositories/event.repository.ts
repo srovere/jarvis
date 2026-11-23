@@ -54,7 +54,7 @@ export class DrizzleEventRepository implements EventRepository {
       .insert(events)
       .values({ accountId, externalId: e.id, ...values })
       .onConflictDoUpdate({
-        target: [events.accountId, events.externalId],
+        target: [events.accountId, events.calendarId, events.externalId],
         set: { ...values, updatedAt: sql`now()` },
       });
   }

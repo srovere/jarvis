@@ -142,7 +142,7 @@ export const events = pgTable(
     ...audit(),
   },
   (t) => [
-    unique('events_account_external_uq').on(t.accountId, t.externalId),
+    unique('events_account_calendar_external_uq').on(t.accountId, t.calendarId, t.externalId),
     index('events_account_starts_at_idx').on(t.accountId, t.startsAt),
   ],
 );
@@ -181,7 +181,7 @@ export const tasks = pgTable(
     ...audit(),
   },
   (t) => [
-    unique('tasks_account_external_uq').on(t.accountId, t.externalId),
+    unique('tasks_account_list_external_uq').on(t.accountId, t.listId, t.externalId),
     index('tasks_account_status_due_idx').on(t.accountId, t.status, t.dueAt),
   ],
 );

@@ -78,4 +78,12 @@ describe('DrizzleTaskRepository', () => {
     await repo.applyChanges('personal', 'list1', [{ kind: 'upsert', task: task('t1') }]);
     expect(await repo.open({ accountIds: ['personal'] })).toHaveLength(1);
   });
+
+  it('keeps the same task id in two lists as separate rows', async () => {
+    await repo.applyChanges('personal', 'list1', [{ kind: 'upsert', task: task('same') }]);
+    await repo.applyChanges('personal', 'list2', [{ kind: 'upsert', task: task('same', { listId: 'list2' }) }]);
+    await repo.applyChanges('personal', 'list1', [{ kind: 'upsert', task: task('same') }]);
+    const got = await repo.open({ accountIds: ['personal'] });
+    expect(got.map((x) => x.listId).sort()).toEqual(['list1', 'list2']);
+  });
 });

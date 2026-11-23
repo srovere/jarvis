@@ -5,7 +5,12 @@ import * as schema from './schema';
 export type Db = NodePgDatabase<typeof schema> & { $client: Pool };
 
 export function createDb(url: string): Db {
-  return drizzle({ client: new Pool({ connectionString: url }), schema });
+  const pool = new Pool({ connectionString: url });
+  // Idle clients can emit errors (e.g. connection reset); without a listener they would crash the process.
+  pool.on('error', (err) => {
+    process.stderr.write(`${JSON.stringify({ level: 'error', msg: 'postgres pool error', error: err.message })}\n`);
+  });
+  return drizzle({ client: pool, schema });
 }
 
 export async function closeDb(db: Db): Promise<void> {

@@ -72,7 +72,7 @@ export class DrizzleTaskRepository implements TaskRepository {
       .insert(tasks)
       .values({ accountId, externalId: t.id, ...values })
       .onConflictDoUpdate({
-        target: [tasks.accountId, tasks.externalId],
+        target: [tasks.accountId, tasks.listId, tasks.externalId],
         set: { ...values, updatedAt: sql`now()` },
       });
   }
