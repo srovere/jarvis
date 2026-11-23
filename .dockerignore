@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+secrets
+.superpowers
+.git
+.env
+*.log
+jarvis.config.yaml
