@@ -66,6 +66,50 @@ describe('GmailAdapter drafts', () => {
     expect(fake.drafts).toHaveLength(2);
   });
 
+  it('anchors a second draft on the real last message, not on the first (unsent) draft', async () => {
+    const { fake, adapter } = setup();
+    fake.seed([
+      buildThread('t1', 'Hola', [{ ...msg('m1', 0), messageIdHeader: '<m1@x>' }]),
+    ]);
+    await adapter.createDraft({ threadId: 't1', body: 'uno' });
+    const ref = await adapter.createDraft({ threadId: 't1', body: 'dos' });
+    expect(ref.to.map((x) => x.address)).toEqual(['a@y.com']);
+    const second = fake.drafts[1]!.mime;
+    expect(second).toContain('In-Reply-To: <m1@x>\r\n');
+    expect(second).toContain('References: <m1@x>\r\n');
+  });
+
+  it('sync after a draft is created contains no upsert for the draft', async () => {
+    const { fake, adapter } = setup();
+    fake.seed([buildThread('t1', 'Hola', [msg('m1', 0)])]);
+    const first = await adapter.sync(null, OPTS);
+    await adapter.createDraft({ threadId: 't1', body: 'uno' });
+    const r = await adapter.sync(first.nextCursor, OPTS);
+    expect(r.changes.some((c) => c.kind === 'upsert')).toBe(false);
+    const full = await adapter.sync(null, OPTS);
+    expect(full.changes.flatMap((c) => (c.kind === 'upsert' ? [c.message.labels] : [])).flat()).not.toContain('DRAFT');
+  });
+
+  it('walks back to the last non-own sender when the last message is own and all recipients are own', async () => {
+    const { fake, adapter } = setup({ sendAs: ['me@x.com', 'yo@gmail.com'] });
+    fake.seed([
+      buildThread('t1', 'Nota', [
+        msg('m1', 0, { from: 'b@y.com', to: ['me@x.com'] }),
+        msg('m2', 5, { from: 'me@x.com', to: ['yo@gmail.com'] }),
+      ]),
+    ]);
+    const ref = await adapter.createDraft({ threadId: 't1', body: 'ok' });
+    expect(ref.to.map((x) => x.address)).toEqual(['b@y.com']);
+  });
+
+  it('throws a DomainError when a self-only thread has no one to reply to', async () => {
+    const { fake, adapter } = setup({ sendAs: ['me@x.com', 'yo@gmail.com'] });
+    fake.seed([buildThread('t1', 'Nota', [msg('m1', 0, { from: 'me@x.com', to: ['yo@gmail.com'] })])]);
+    await expect(adapter.createDraft({ threadId: 't1', body: 'x' })).rejects.toThrow(
+      'No hay destinatario para responder en este hilo',
+    );
+  });
+
   it('rejects a draft for an unknown thread with a DomainError', async () => {
     const { adapter } = setup();
     await expect(adapter.createDraft({ threadId: 'nope', body: 'x' })).rejects.toBeInstanceOf(DomainError);
@@ -220,6 +264,22 @@ describe('GmailAdapter sync', () => {
     expect(r.fullResync).toBe(true);
     expect(r.nextCursor).not.toBe('123');
     expect(r.changes).toHaveLength(1);
+  });
+
+  it('turns a stored message that is now in TRASH or SPAM into a delete', async () => {
+    const { fake, adapter } = setup();
+    fake.seed([buildThread('t1', 'Hola', [msg('m1', 0), msg('m2', 1)])]);
+    const first = await adapter.sync(null, OPTS);
+    fake.setLabels('m1', ['TRASH']);
+    fake.setLabels('m2', ['INBOX', 'SPAM']);
+    const r = await adapter.sync(first.nextCursor, OPTS);
+    expect(r.changes).toEqual(
+      expect.arrayContaining([
+        { kind: 'delete', messageId: 'm1' },
+        { kind: 'delete', messageId: 'm2' },
+      ]),
+    );
+    expect(r.changes.some((c) => c.kind === 'upsert')).toBe(false);
   });
 
   it('treats a 404 on a history-referenced message as a delete', async () => {

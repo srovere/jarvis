@@ -20,6 +20,9 @@ const LIST_HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date'];
 const SYNC_HEADERS = [...LIST_HEADERS, 'Message-ID', 'References'];
 const HISTORY_TYPES = ['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'];
 const FETCH_BATCH = 10;
+/** Mensajes con estas etiquetas no se sincronizan ni sirven de ancla para responder (DRAFT). */
+const EXCLUDED_LABELS = ['DRAFT', 'TRASH', 'SPAM'];
+const isExcluded = (m: { labels: string[] }): boolean => m.labels.some((l) => EXCLUDED_LABELS.includes(l));
 
 interface ApiError {
   code?: unknown;
@@ -83,8 +86,9 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
   async createDraft(r: DraftRequest): Promise<DraftRef> {
     if (!r.to?.length && !r.threadId) throw new DomainError('Draft requires recipients or a threadId');
     const own = await this.ownAddresses();
-    const last = r.threadId ? await this.lastMessageOf(r.threadId) : undefined;
-    const to = r.to?.length ? r.to : this.replyRecipients(last!, own);
+    const thread = r.threadId ? await this.replyContext(r.threadId) : undefined;
+    const last = thread?.[thread.length - 1];
+    const to = r.to?.length ? r.to : this.replyRecipients(thread!, own);
     const subject = r.subject ?? (last ? this.replySubject(last.subject) : '');
     const raw = buildMime({
       from: await this.fromAddress(own),
@@ -167,7 +171,8 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     const fetched = await this.inBatches(ids, async (id) => ({ id, message: await this.fetchMessage(id) }));
     const out: MailChange[] = [];
     for (const { id, message } of fetched) {
-      if (message) out.push({ kind: 'upsert', message: this.mapper.toMessage(message) });
+      const mapped = message ? this.mapper.toMessage(message) : undefined;
+      if (mapped && !isExcluded(mapped)) out.push({ kind: 'upsert', message: mapped });
       else deletes?.push({ kind: 'delete', messageId: id });
     }
     return out;
@@ -198,7 +203,8 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     );
   }
 
-  private async lastMessageOf(threadId: string): Promise<MailMessage> {
+  /** Mensajes reales del hilo (sin borradores) en orden cronológico. */
+  private async replyContext(threadId: string): Promise<MailMessage[]> {
     let thread: MailThread;
     try {
       thread = this.mapper.toThread(await this.fetchThread(threadId, 'metadata', SYNC_HEADERS));
@@ -206,7 +212,9 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
       if (isNotFound(e)) throw new DomainError(`Thread not found: ${threadId}`);
       throw e;
     }
-    return thread.messages[thread.messages.length - 1]!;
+    const messages = thread.messages.filter((m) => !m.labels.includes('DRAFT'));
+    if (messages.length === 0) throw new DomainError(`Thread has no messages: ${threadId}`);
+    return messages;
   }
 
   private sendAsList(): Promise<gmail_v1.Schema$SendAs[]> {
@@ -257,10 +265,15 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     }
   }
 
-  private replyRecipients(last: MailMessage, own: EmailAddress[]): EmailAddress[] {
+  private replyRecipients(messages: MailMessage[], own: EmailAddress[]): EmailAddress[] {
     const isOwn = (a: EmailAddress): boolean => own.some((o) => o.equals(a));
+    const last = messages[messages.length - 1]!;
     if (!isOwn(last.from)) return [last.from];
-    return [last.to.find((a) => !isOwn(a)) ?? last.from];
+    const other = last.to.find((a) => !isOwn(a));
+    if (other) return [other];
+    const sender = [...messages].reverse().find((m) => !isOwn(m.from))?.from;
+    if (!sender) throw new DomainError('No hay destinatario para responder en este hilo');
+    return [sender];
   }
 
   private replySubject(subject: string): string {

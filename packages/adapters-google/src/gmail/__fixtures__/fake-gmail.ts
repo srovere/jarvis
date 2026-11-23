@@ -9,7 +9,8 @@ interface HistoryRecord {
   id: number;
   added: string[];
   deleted: string[];
-  labelChanged: string[];
+  labelsAdded: string[];
+  labelsRemoved: string[];
 }
 
 export interface FakeGmailOptions {
@@ -82,8 +83,13 @@ export class FakeGmail {
   }
 
   setLabels(id: string, labels: string[]): void {
-    this.messages.get(id)!.labelIds = labels;
-    this.record({ labelChanged: [id] });
+    const m = this.messages.get(id)!;
+    const before = m.labelIds ?? [];
+    m.labelIds = labels;
+    this.record({
+      labelsAdded: labels.some((l) => !before.includes(l)) ? [id] : [],
+      labelsRemoved: before.some((l) => !labels.includes(l)) ? [id] : [],
+    });
   }
 
   /** Simula que Gmail ya no conserva el historial anterior al actual (404 en `history.list`). */
@@ -119,7 +125,9 @@ export class FakeGmail {
           this.calls.messagesList(p);
           const days = /newer_than:(\d+)d/.exec(p.q ?? '')?.[1];
           const cutoff = days ? this.now() - Number(days) * 86_400_000 : -Infinity;
-          const matching = [...this.messages.values()].filter((m) => Number(m.internalDate) >= cutoff);
+          const matching = [...this.messages.values()].filter(
+            (m) => Number(m.internalDate) >= cutoff && !m.labelIds?.some((l) => l === 'TRASH' || l === 'SPAM'),
+          );
           const offset = Number(p.pageToken ?? 0);
           const page = matching.slice(offset, offset + this.pageSize);
           const next = offset + this.pageSize < matching.length ? String(offset + this.pageSize) : undefined;
@@ -134,23 +142,25 @@ export class FakeGmail {
         send: this.sendSpy,
       },
       history: {
-        list: async (p: { startHistoryId: string; pageToken?: string }) => {
+        list: async (p: { startHistoryId: string; pageToken?: string; historyTypes?: string[] }) => {
           this.calls.historyList(p);
           if (Number(p.startHistoryId) < this.oldestHistoryId) throw apiError(404);
           const pending = this.history.filter((r) => r.id > Number(p.startHistoryId));
           const offset = Number(p.pageToken ?? 0);
           const page = pending.slice(offset, offset + this.pageSize);
           const next = offset + this.pageSize < pending.length ? String(offset + this.pageSize) : undefined;
-          const ref = (ids: string[]) => ids.map((id) => ({ message: { id, threadId: 'unknown' } }));
+          const ref = (ids: string[], type: string) =>
+            !p.historyTypes || p.historyTypes.includes(type) ? ids.map((id) => ({ message: { id, threadId: 'unknown' } })) : [];
           return {
             data: {
               historyId: String(this.historyId),
               nextPageToken: next,
               history: page.map((r) => ({
                 id: String(r.id),
-                messagesAdded: ref(r.added),
-                messagesDeleted: ref(r.deleted),
-                labelsAdded: ref(r.labelChanged),
+                messagesAdded: ref(r.added, 'messageAdded'),
+                messagesDeleted: ref(r.deleted, 'messageDeleted'),
+                labelsAdded: ref(r.labelsAdded, 'labelAdded'),
+                labelsRemoved: ref(r.labelsRemoved, 'labelRemoved'),
               })),
             },
           };
@@ -161,8 +171,11 @@ export class FakeGmail {
           this.calls.draftsCreate(p);
           const { raw, threadId } = p.requestBody.message;
           const id = `draft-${this.drafts.length + 1}`;
-          this.drafts.push({ id, ...(threadId && { threadId }), mime: Buffer.from(raw, 'base64url').toString('utf8') });
-          return { data: { id, message: { id: `msg-${id}`, ...(threadId && { threadId }) } } };
+          const mime = Buffer.from(raw, 'base64url').toString('utf8');
+          this.drafts.push({ id, ...(threadId && { threadId }), mime });
+          const message = this.draftMessage(`msg-${id}`, threadId ?? `thread-${id}`, mime);
+          this.putMessage(message);
+          return { data: { id, message: { id: message.id, threadId: message.threadId } } };
         },
         send: this.draftSendSpy,
       },
@@ -181,15 +194,33 @@ export class FakeGmail {
 
   // --- internos --------------------------------------------------------------------------------
 
+  /** Un borrador aparece en `threads.get` como un mensaje más, con la etiqueta DRAFT. */
+  private draftMessage(id: string, threadId: string, mime: string): Message {
+    const [head = ''] = mime.split('\r\n\r\n');
+    const headers: Header[] = head
+      .replace(/\r\n[ \t]+/g, ' ')
+      .split('\r\n')
+      .map((line) => ({ name: line.slice(0, line.indexOf(':')), value: line.slice(line.indexOf(':') + 1).trim() }));
+    headers.push({ name: 'Message-ID', value: `<${id}@fake.test>` });
+    return {
+      id,
+      threadId,
+      labelIds: ['DRAFT'],
+      snippet: '',
+      internalDate: String(this.now()),
+      payload: { mimeType: 'text/plain', headers },
+    };
+  }
+
   private putMessage(m: Message): void {
     const existed = this.messages.has(m.id!);
     this.messages.set(m.id!, m);
-    this.record(existed ? { labelChanged: [m.id!] } : { added: [m.id!] });
+    this.record(existed ? { labelsAdded: [m.id!] } : { added: [m.id!] });
   }
 
   private record(r: Partial<Omit<HistoryRecord, 'id'>>): void {
     this.historyId += 1;
-    this.history.push({ id: this.historyId, added: [], deleted: [], labelChanged: [], ...r });
+    this.history.push({ id: this.historyId, added: [], deleted: [], labelsAdded: [], labelsRemoved: [], ...r });
   }
 
   private byThread(): Map<string, Message[]> {
