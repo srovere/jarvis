@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Credentials } from 'google-auth-library';
 
@@ -23,8 +23,13 @@ export class FileTokenStore {
     const file = this.fileFor(accountId);
     await mkdir(this.dir, { recursive: true, mode: 0o700 });
     const tmp = `${file}.${randomBytes(6).toString('hex')}.tmp`;
-    await writeFile(tmp, JSON.stringify(credentials), { mode: 0o600 });
-    await rename(tmp, file);
+    try {
+      await writeFile(tmp, JSON.stringify(credentials), { mode: 0o600, flag: 'wx' });
+      await rename(tmp, file);
+    } catch (error) {
+      await rm(tmp, { force: true });
+      throw error;
+    }
   }
 
   private fileFor(accountId: string): string {

@@ -32,18 +32,28 @@ export class GoogleOAuthFlow {
     options: Partial<GoogleOAuthFlowOptions> = {},
   ) {
     this.options = {
-      port: Number(process.env.JARVIS_OAUTH_PORT ?? 53682),
+      port: GoogleOAuthFlow.envPort(),
       bindHost: process.env.JARVIS_OAUTH_BIND ?? '127.0.0.1',
       timeoutMs: 5 * 60 * 1000,
       ...options,
     };
   }
 
+  private static envPort(): number {
+    const raw = process.env.JARVIS_OAUTH_PORT;
+    if (raw === undefined) return 53682;
+    const port = Number(raw);
+    if (raw.trim() === '' || !Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(`JARVIS_OAUTH_PORT inválido: ${JSON.stringify(raw)} (debe ser un entero entre 1 y 65535)`);
+    }
+    return port;
+  }
+
   /** Autoriza una cuenta vía loopback: imprime la URL en stderr, espera el callback y guarda el token. */
   async authorizeInteractive(accountId: string): Promise<void> {
     const secret = await this.readClientSecret();
     const state = randomBytes(16).toString('hex');
-    const { server, codePromise } = this.listenForCallback(state);
+    const { server, codePromise, cancelTimer } = this.listenForCallback(state);
     try {
       const port = await this.listening(server);
       const client = new OAuth2Client(secret.client_id, secret.client_secret, `http://127.0.0.1:${port}${CALLBACK_PATH}`);
@@ -61,6 +71,7 @@ export class GoogleOAuthFlow {
       }
       await this.store.write(accountId, tokens);
     } finally {
+      cancelTimer();
       server.close();
       server.closeAllConnections();
     }
@@ -104,7 +115,7 @@ export class GoogleOAuthFlow {
     });
   }
 
-  private listenForCallback(state: string): { server: Server; codePromise: Promise<string> } {
+  private listenForCallback(state: string): { server: Server; codePromise: Promise<string>; cancelTimer: () => void } {
     let settle!: { resolve(code: string): void; reject(error: Error): void };
     const codePromise = new Promise<string>((resolve, reject) => {
       settle = { resolve, reject };
@@ -136,11 +147,7 @@ export class GoogleOAuthFlow {
         .end('<!doctype html><meta charset="utf-8"><p>Listo, podés cerrar esta pestaña.</p>');
       settle.resolve(code);
     });
-    // Evita un timer colgado si el servidor falla al iniciar.
-    codePromise.then(
-      () => clearTimeout(timer),
-      () => clearTimeout(timer),
-    );
-    return { server, codePromise };
+    // El timer debe cancelarse también si el servidor no llega a iniciar (p. ej. EADDRINUSE).
+    return { server, codePromise, cancelTimer: () => clearTimeout(timer) };
   }
 }

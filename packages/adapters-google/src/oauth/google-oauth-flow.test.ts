@@ -25,6 +25,20 @@ describe('GoogleOAuthFlow', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  describe('options', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it.each(['0', '65536', 'abc', '1.5', ''])('rejects invalid JARVIS_OAUTH_PORT %j', (port) => {
+      vi.stubEnv('JARVIS_OAUTH_PORT', port);
+      expect(() => new GoogleOAuthFlow(secretPath, store)).toThrow(/JARVIS_OAUTH_PORT/);
+    });
+
+    it('accepts a valid JARVIS_OAUTH_PORT', () => {
+      vi.stubEnv('JARVIS_OAUTH_PORT', '4000');
+      expect(() => new GoogleOAuthFlow(secretPath, store)).not.toThrow();
+    });
+  });
+
   describe('client()', () => {
     it('throws ReauthRequired when no token is stored', async () => {
       const flow = new GoogleOAuthFlow(secretPath, store);
@@ -119,6 +133,21 @@ describe('GoogleOAuthFlow', () => {
       await fetch(`${origin}/oauth2callback?code=abc&state=${url.searchParams.get('state')}`);
       await assertion;
       expect(await store.read('personal')).toBeNull();
+    });
+
+    it('fails fast and clears the timer when the port is in use', async () => {
+      const { createServer } = await import('node:net');
+      const blocker = createServer();
+      await new Promise<void>((r) => blocker.listen(0, '127.0.0.1', r));
+      const port = (blocker.address() as import('node:net').AddressInfo).port;
+      const clear = vi.spyOn(globalThis, 'clearTimeout');
+      try {
+        const flow = new GoogleOAuthFlow(secretPath, store, { port });
+        await expect(flow.authorizeInteractive('personal')).rejects.toThrow(/EADDRINUSE/);
+        expect(clear).toHaveBeenCalled();
+      } finally {
+        blocker.close();
+      }
     });
 
     it('times out with a clear error', async () => {

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -32,6 +32,14 @@ describe('FileTokenStore', () => {
     await store.write('personal', { refresh_token: 'r2' });
     expect((await store.read('personal'))?.refresh_token).toBe('r2');
     expect(readdirSync(dir)).toEqual(['google-personal.json']);
+  });
+
+  it('leaves no temp file behind when the write fails', async () => {
+    const { readdirSync } = await import('node:fs');
+    const dir = join(root, 'tokens');
+    mkdirSync(join(dir, 'google-personal.json'), { recursive: true });
+    await expect(new FileTokenStore(dir).write('personal', { refresh_token: 'r1' })).rejects.toThrow();
+    expect(readdirSync(dir).filter((f) => f.endsWith('.tmp'))).toEqual([]);
   });
 
   it('rejects account ids that could escape the directory', async () => {
