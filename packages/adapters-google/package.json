@@ -9,5 +9,9 @@
     "build": "tsc -b",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@jarvis/core": "workspace:*",
+    "google-auth-library": "^11.3.4"
   }
 }

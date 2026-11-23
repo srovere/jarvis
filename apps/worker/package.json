@@ -9,5 +9,14 @@
     "build": "tsc -b",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@jarvis/adapters-google": "workspace:*",
+    "@jarvis/config": "workspace:*",
+    "@jarvis/core": "workspace:*",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
   }
 }
