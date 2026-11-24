@@ -141,8 +141,13 @@ pnpm lint:deps    # architecture rules (dependency-cruiser)
 
 ## Troubleshooting
 
-- **`needs_reauth` in the logs or the briefing:** the account's token was revoked or expired. Repeat step 3 for that
-  account (`auth --account <id>`).
+- **`needs_reauth` in the logs, the briefing or `sync --once`:** the account's token was revoked or expired (the log
+  line is `account needs re-authorization`). Repeat step 3 for that account (`auth --account <id>`). A successful
+  `auth` sets the account back to `active` in the database, and the running worker and mcp-server pick up the new
+  token on their next sync or tool call: no restart needed. `jarvis sync --once` exits non-zero while any account
+  needs re-authorization or none is active.
+- **An account removed from `jarvis.config.yaml`** is set to `disabled` on the next worker start (it is no longer
+  synced nor used for writes); adding it back re-enables it.
 - **Port 53682 in use:** free the port, or use another one with `-e JARVIS_OAUTH_PORT=53700` and publish that same
   port (`-p 127.0.0.1:53700:53700`).
 - **The token expires after 7 days:** the app is still in *Testing* mode; publish it to production (step 1.4) and

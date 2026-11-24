@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { dirname, resolve } from 'node:path';
 import { FileTokenStore, GoogleOAuthFlow } from '@jarvis/adapters-google';
-import { closeDb, createDb, runMigrations } from '@jarvis/adapters-persistence';
+import { closeDb, createDb, DrizzleAccountRepository, runMigrations } from '@jarvis/adapters-persistence';
 import {
   authPaths,
   defaultConfigPath,
@@ -41,6 +41,8 @@ export interface CliDeps {
   /** `DATABASE_URL`; throws a clear error when missing. */
   databaseUrl(): string;
   migrate(databaseUrl: string): Promise<void>;
+  /** Sets the account back to `active` (no-op when it is not in the database yet or already active). */
+  reactivateAccount(databaseUrl: string, accountId: string): Promise<void>;
   openSync(options: ProvidersModuleOptions): Promise<SyncSession>;
   out(message: string): void;
   err(message: string): void;
@@ -61,10 +63,16 @@ export function buildProgram(deps: CliDeps): Command {
       try {
         const { config, dir } = deps.loadConfig();
         if (!config.accounts.some((a) => a.id === opts.account)) {
-          const ids = config.accounts.map((a) => a.id).join(', ') || '(ninguna)';
+          const ids = config.accounts.map((a) => a.id).join(', ') || '(none)';
           throw new Error(`Account "${opts.account}" is not in the config. Configured accounts: ${ids}`);
         }
         await deps.createAuthorizer(authPaths(config, dir)).authorizeInteractive(opts.account);
+        try {
+          await deps.reactivateAccount(deps.databaseUrl(), opts.account);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(`Token saved, but the account could not be reactivated: ${reason}`);
+        }
         deps.out(`Token saved for ${opts.account}`);
       } catch (error) {
         fail(deps, error);
@@ -77,7 +85,7 @@ export function buildProgram(deps: CliDeps): Command {
     .action(async () => {
       try {
         await deps.migrate(deps.databaseUrl());
-        deps.out('Migraciones aplicadas');
+        deps.out('Migrations applied');
       } catch (error) {
         fail(deps, error);
       }
@@ -103,7 +111,11 @@ export function buildProgram(deps: CliDeps): Command {
         return fail(deps, error);
       }
       deps.out(JSON.stringify({ accounts: outcomes }));
-      if (outcomes.some(failed)) deps.exit(1);
+      for (const o of outcomes.filter((x) => x.status === 'needs_reauth')) {
+        deps.err(`Account ${o.accountId} needs re-authorization: run "jarvis auth --account ${o.accountId}"`);
+      }
+      if (outcomes.length === 0) deps.err('No active accounts to sync');
+      if (outcomes.length === 0 || outcomes.some(failed)) deps.exit(1);
     });
 
   return program;
@@ -114,9 +126,9 @@ function fail(deps: CliDeps, error: unknown): never {
   return deps.exit(1);
 }
 
-/** The account's sync aborted, or one of its resources failed. */
+/** The account needs re-authorization, its sync aborted, or one of its resources failed. */
 function failed(o: AccountSyncOutcome): boolean {
-  return o.error !== undefined || Object.values(o.result?.resources ?? {}).includes('error');
+  return o.status !== 'active' || o.error !== undefined || Object.values(o.result?.resources ?? {}).includes('error');
 }
 
 export function defaultDeps(): CliDeps {
@@ -132,6 +144,16 @@ export function defaultDeps(): CliDeps {
       const db = createDb(url);
       try {
         await runMigrations(db);
+      } finally {
+        await closeDb(db);
+      }
+    },
+    reactivateAccount: async (url, accountId) => {
+      const db = createDb(url);
+      try {
+        const accounts = new DrizzleAccountRepository(db);
+        const account = (await accounts.list()).find((a) => a.id === accountId);
+        if (account && account.status !== 'active') await accounts.setStatus(accountId, 'active');
       } finally {
         await closeDb(db);
       }

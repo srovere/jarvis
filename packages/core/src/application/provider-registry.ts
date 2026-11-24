@@ -21,4 +21,9 @@ export class ProviderRegistry {
     created.catch(() => this.bundles.delete(a.id));
     return created;
   }
+
+  /** Drops the cached bundle so the next lookup rebuilds it (e.g. re-reading a re-authorized token). */
+  invalidate(accountId: string): void {
+    this.bundles.delete(accountId);
+  }
 }
