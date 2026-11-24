@@ -24,5 +24,9 @@ export const TOKENS = {
   CreateDraft: Symbol('CreateDraft'),
   CreateTask: Symbol('CreateTask'),
   CompleteTask: Symbol('CompleteTask'),
+  AccountConnectors: Symbol('AccountConnectors'),
+  ConnectAccount: Symbol('ConnectAccount'),
+  RemoveAccount: Symbol('RemoveAccount'),
+  SetBusyCalendars: Symbol('SetBusyCalendars'),
 } as const;
 

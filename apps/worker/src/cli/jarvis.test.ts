@@ -11,10 +11,18 @@ class ExitCalled extends Error {
 
 const OK = { status: 'active', resources: { mail: 'ok', calendar: 'ok', tasks: 'skipped' }, fullResync: [] } as const;
 
-function setup(authorize = vi.fn().mockResolvedValue(undefined)) {
+const RECEIVED = { code: 'c', redirectUri: 'http://127.0.0.1:1/cb', verifier: 'v' };
+
+function setup(complete = vi.fn().mockResolvedValue({ id: 'ana', email: { address: 'ana@example.com' } })) {
   const created: unknown[] = [];
   const migrate = vi.fn().mockResolvedValue(undefined);
-  const reactivate = vi.fn().mockResolvedValue(undefined);
+  const begin = vi.fn().mockResolvedValue({ url: 'u', state: 's', verifier: 'v' });
+  const closeConnect = vi.fn().mockResolvedValue(undefined);
+  const openConnect = vi.fn().mockResolvedValue({ begin, complete, close: closeConnect });
+  const receive = vi.fn(async (b: (r: string) => Promise<unknown>) => {
+    await b(RECEIVED.redirectUri);
+    return RECEIVED;
+  });
   const session = {
     run: vi.fn().mockResolvedValue([{ accountId: 'personal', status: 'active', result: OK }]),
     close: vi.fn().mockResolvedValue(undefined),
@@ -32,14 +40,14 @@ function setup(authorize = vi.fn().mockResolvedValue(undefined)) {
     loadConfig: () => ({ config, dir: '/etc/jarvis' }),
     createAuthorizer: (paths) => {
       created.push(paths);
-      return { authorizeInteractive: authorize };
+      return { receiveAuthorizationCode: receive };
     },
     databaseUrl: () => {
       if (databaseUrl === undefined) throw new Error('Missing DATABASE_URL');
       return databaseUrl;
     },
     migrate,
-    reactivateAccount: reactivate,
+    openConnect,
     openSync,
     out: (m) => out.push(m),
     err: (m) => err.push(m),
@@ -49,64 +57,46 @@ function setup(authorize = vi.fn().mockResolvedValue(undefined)) {
   };
   const run = (...args: string[]) => buildProgram(deps).parseAsync(['node', 'jarvis', ...args]);
   const unsetDatabaseUrl = () => (databaseUrl = undefined);
-  return { run, out, err, authorize, created, migrate, reactivate, openSync, session, config, unsetDatabaseUrl };
+  return { run, out, err, complete, begin, closeConnect, openConnect, receive, created, migrate, openSync, session, config, unsetDatabaseUrl };
 }
 
 describe('jarvis auth', () => {
-  it('authorizes a configured account and confirms', async () => {
-    const { run, out, authorize } = setup();
-    await run('auth', '--account', 'personal');
-    expect(authorize).toHaveBeenCalledWith('personal');
-    expect(out).toEqual(['Token saved for personal']);
+  it('connects an account with a derived id (no --account) as createdVia cli', async () => {
+    const { run, out, complete, begin, closeConnect } = setup();
+    await run('auth');
+    expect(begin).toHaveBeenCalledWith('google', RECEIVED.redirectUri);
+    expect(complete).toHaveBeenCalledWith('google', RECEIVED, { createdVia: 'cli' });
+    expect(out).toEqual(['Token saved for ana (ana@example.com)']);
+    expect(closeConnect).toHaveBeenCalled();
   });
 
-  it('puts the account back to active in the database after storing the token', async () => {
-    const { run, out, reactivate } = setup();
-    await run('auth', '--account', 'personal');
-    expect(reactivate).toHaveBeenCalledWith('postgres://db/jarvis', 'personal');
-    expect(out).toEqual(['Token saved for personal']);
+  it('passes an explicit --account, even when it is not in the YAML config', async () => {
+    const { run, complete } = setup();
+    await run('auth', '--account', 'nope');
+    expect(complete).toHaveBeenCalledWith('google', RECEIVED, { accountId: 'nope', createdVia: 'cli' });
   });
 
-  it('does not reactivate when authorization fails', async () => {
-    const { run, reactivate } = setup(vi.fn().mockRejectedValue(new Error('boom')));
-    await expect(run('auth', '--account', 'personal')).rejects.toMatchObject({ code: 1 });
-    expect(reactivate).not.toHaveBeenCalled();
+  it('reports a conflicting account id and still closes the session', async () => {
+    const { run, err, closeConnect } = setup(vi.fn().mockRejectedValue(new Error('Account id "x" is already used by another email')));
+    await expect(run('auth', '--account', 'x')).rejects.toMatchObject({ code: 1 });
+    expect(err).toEqual(['Account id "x" is already used by another email']);
+    expect(closeConnect).toHaveBeenCalled();
   });
 
-  it('exits 1 telling that the token was saved when the account cannot be reactivated', async () => {
-    const { run, err, reactivate } = setup();
-    reactivate.mockRejectedValue(new Error('connection refused'));
-    await expect(run('auth', '--account', 'personal')).rejects.toMatchObject({ code: 1 });
-    expect(err).toEqual(['Token saved, but the account could not be reactivated: connection refused']);
-  });
-
-  it('exits 1 listing configured ids for an unknown account', async () => {
-    const { run, err, authorize } = setup();
-    await expect(run('auth', '--account', 'nope')).rejects.toMatchObject({ code: 1 });
-    expect(authorize).not.toHaveBeenCalled();
-    expect(err).toEqual([
-      'Account "nope" is not in the config. Configured accounts: personal, work',
-    ]);
-  });
-
-  it('reports flow errors on stderr and exits 1', async () => {
-    const { run, err } = setup(vi.fn().mockRejectedValue(new Error('boom')));
-    await expect(run('auth', '--account', 'personal')).rejects.toMatchObject({ code: 1 });
-    expect(err).toEqual(['boom']);
+  it('reports a missing DATABASE_URL before opening anything', async () => {
+    const { run, err, unsetDatabaseUrl, receive } = setup();
+    unsetDatabaseUrl();
+    await expect(run('auth')).rejects.toMatchObject({ code: 1 });
+    expect(err).toEqual(['Missing DATABASE_URL']);
+    expect(receive).not.toHaveBeenCalled();
   });
 
   it('resolves relative secretsDir/dataDir against the config directory', async () => {
     const { run, created } = setup();
-    await run('auth', '--account', 'personal');
+    await run('auth');
     expect(created).toEqual([
       { clientSecretPath: resolve('/etc/jarvis/secrets/google_oauth_client'), tokenDir: '/abs/data/tokens' },
     ]);
-  });
-
-  it('exits 1 when --account is missing', async () => {
-    const { run, err } = setup();
-    await expect(run('auth')).rejects.toMatchObject({ code: 1 });
-    expect(err.join('\n')).toContain('--account');
   });
 
   it('exits 0 for --help', async () => {

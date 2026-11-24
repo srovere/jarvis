@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { ReauthRequired } from '@jarvis/core';
+import { ReauthRequired, type AuthorizationStart } from '@jarvis/core';
 import { OAuth2Client, type Credentials } from 'google-auth-library';
 import { FileClientSecretReader, type ClientSecretReader } from './client-secret-store';
 import { GoogleAccountConnector, type EmailResolver } from './google-account-connector';
@@ -52,21 +52,32 @@ export class GoogleOAuthFlow {
   /** Authorizes an account via loopback: prints the URL to stderr, waits for the callback and stores the token. */
   async authorizeInteractive(accountId: string): Promise<void> {
     await this.secrets.read(); // fail early on a missing or invalid client file
+    const received = await this.receiveAuthorizationCode(
+      (redirectUri) => this.connector.beginAuthorization({ redirectUri }),
+      `account ${accountId}`,
+    );
+    const { credentials } = await this.connector.completeAuthorization(received);
+    await this.connector.saveCredentials(accountId, credentials);
+  }
+
+  /**
+   * Runs the loopback callback server: `begin` receives the redirect URI and returns the authorization start; its URL is
+   * printed to stderr. Resolves with the code once the callback with the right state arrives.
+   */
+  async receiveAuthorizationCode(
+    begin: (redirectUri: string) => Promise<AuthorizationStart>,
+    label = 'a Google account',
+  ): Promise<{ code: string; redirectUri: string; verifier: string }> {
     let expectedState = '';
     const { server, codePromise, cancelTimer } = this.listenForCallback(() => expectedState);
     try {
       const port = await this.listening(server);
       const redirectUri = `http://127.0.0.1:${port}${CALLBACK_PATH}`;
-      const start = await this.connector.beginAuthorization({ redirectUri });
+      const start = await begin(redirectUri);
       expectedState = start.state;
-      process.stderr.write(`Open this URL in your browser to authorize account ${accountId}:\n${start.url}\n`);
+      process.stderr.write(`Open this URL in your browser to authorize ${label}:\n${start.url}\n`);
       const code = await codePromise;
-      const { credentials } = await this.connector.completeAuthorization({
-        code,
-        redirectUri,
-        verifier: start.verifier,
-      });
-      await this.connector.saveCredentials(accountId, credentials);
+      return { code, redirectUri, verifier: start.verifier };
     } finally {
       cancelTimer();
       server.close();

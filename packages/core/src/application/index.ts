@@ -16,3 +16,7 @@ export * from './use-cases/read-thread';
 export * from './use-cases/search-emails';
 export * from './use-cases/sync-account';
 export * from './use-cases/import-config';
+export * from './account-id';
+export * from './use-cases/connect-account';
+export * from './use-cases/remove-account';
+export * from './use-cases/set-busy-calendars';

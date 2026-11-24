@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import {
   closeDb,
   createDb,
@@ -10,11 +11,19 @@ import {
   NullPersonLinkLookup,
   type Db,
 } from '@jarvis/adapters-persistence';
-import { FileTokenStore, GoogleOAuthFlow, GoogleProviderFactory, htmlToPlainText } from '@jarvis/adapters-google';
+import {
+  FileTokenStore,
+  GoogleAccountConnector,
+  GoogleClientSecretStore,
+  GoogleOAuthFlow,
+  GoogleProviderFactory,
+  htmlToPlainText,
+} from '@jarvis/adapters-google';
 import type { JarvisConfig } from '@jarvis/config';
 import {
   BlockFocusTime,
   CompleteTask,
+  ConnectAccount,
   CreateDraft,
   CreateTask,
   EmailCleaner,
@@ -26,9 +35,12 @@ import {
   PriorityRules,
   ProviderRegistry,
   ReadThread,
+  RemoveAccount,
   SearchEmails,
+  SetBusyCalendars,
   SyncAccount,
   TOKENS,
+  type AccountConnector,
   type AccountRepository,
   type Clock,
   type SettingsStore,
@@ -97,6 +109,10 @@ export class ProvidersModule implements OnApplicationShutdown {
       construct(T.TaskRepository, DrizzleTaskRepository, [DB]),
       { provide: T.PersonLinkLookup, useClass: NullPersonLinkLookup },
       { provide: T.ProviderRegistry, useFactory: () => googleRegistry(config, configDir) },
+      { provide: T.AccountConnectors, useFactory: () => [googleConnector(config, configDir)] },
+      construct(T.ConnectAccount, ConnectAccount, [T.AccountConnectors, T.AccountRepository, T.ProviderRegistry]),
+      construct(T.RemoveAccount, RemoveAccount, [T.AccountConnectors, T.AccountRepository, T.ProviderRegistry]),
+      construct(T.SetBusyCalendars, SetBusyCalendars, [T.AccountRepository]),
       {
         provide: T.EmailCleaner,
         useFactory: () => new EmailCleaner({ maxChars: config.email.maxBodyChars, htmlToText: htmlToPlainText }),
@@ -164,4 +180,17 @@ function googleRegistry(config: JarvisConfig, configDir: string): ProviderRegist
   const oauth = new GoogleOAuthFlow(clientSecretPath, new FileTokenStore(tokenDir));
   registry.register(new GoogleProviderFactory(oauth, config.timezone));
   return registry;
+}
+
+/**
+ * Google connector. The token directory follows the existing configuration (`dataDir/tokens`); the OAuth client is the
+ * uploaded one under `JARVIS_DATA_DIR` (default `/data`) with the phase-1 `secretsDir/google_oauth_client` as fallback.
+ */
+function googleConnector(config: JarvisConfig, configDir: string): AccountConnector {
+  const { tokenDir } = authPaths(config, configDir);
+  const secrets = new GoogleClientSecretStore({
+    dataDir: process.env.JARVIS_DATA_DIR?.trim() || '/data',
+    legacySecretsDir: resolve(configDir, config.secretsDir),
+  });
+  return new GoogleAccountConnector(secrets, new FileTokenStore(tokenDir));
 }

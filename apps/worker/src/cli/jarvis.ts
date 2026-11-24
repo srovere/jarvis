@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { dirname, resolve } from 'node:path';
 import { FileTokenStore, GoogleOAuthFlow } from '@jarvis/adapters-google';
-import { closeDb, createDb, DrizzleAccountRepository, runMigrations } from '@jarvis/adapters-persistence';
+import { closeDb, createDb, runMigrations } from '@jarvis/adapters-persistence';
 import {
   authPaths,
   defaultConfigPath,
@@ -12,6 +12,7 @@ import {
   type ProvidersModuleOptions,
 } from '@jarvis/composition';
 import { loadOptionalConfig, type JarvisConfig } from '@jarvis/config';
+import { TOKENS, type Account, type AuthorizationStart, type ConnectAccount } from '@jarvis/core';
 import { NestFactory } from '@nestjs/core';
 import { Command } from 'commander';
 import { AccountSyncRunner, type AccountSyncOutcome } from '../account-sync-runner';
@@ -19,8 +20,22 @@ import { SyncModule } from '../sync.module';
 
 export type { AuthPaths };
 
+/** Receives the browser authorization through a loopback callback server. */
 export interface Authorizer {
-  authorizeInteractive(accountId: string): Promise<void>;
+  receiveAuthorizationCode(
+    begin: (redirectUri: string) => Promise<AuthorizationStart>,
+  ): Promise<{ code: string; redirectUri: string; verifier: string }>;
+}
+
+/** `ConnectAccount` with a one-shot application context behind it. */
+export interface ConnectSession {
+  begin: ConnectAccount['begin'];
+  complete(
+    kind: string,
+    input: { code: string; redirectUri: string; verifier: string },
+    options: { accountId?: string; createdVia: Account['createdVia'] },
+  ): Promise<Account>;
+  close(): Promise<void>;
 }
 
 export interface LoadedConfig {
@@ -43,8 +58,7 @@ export interface CliDeps {
   /** `DATABASE_URL`; throws a clear error when missing. */
   databaseUrl(): string;
   migrate(databaseUrl: string): Promise<void>;
-  /** Sets the account back to `active` (no-op when it is not in the database yet or already active). */
-  reactivateAccount(databaseUrl: string, accountId: string): Promise<void>;
+  openConnect(options: ProvidersModuleOptions): Promise<ConnectSession>;
   openSync(options: ProvidersModuleOptions): Promise<SyncSession>;
   out(message: string): void;
   err(message: string): void;
@@ -59,23 +73,30 @@ export function buildProgram(deps: CliDeps): Command {
 
   program
     .command('auth')
-    .description('Authorize a Google account and store its token')
-    .requiredOption('--account <id>', 'account id as defined in the config')
-    .action(async (opts: { account: string }) => {
+    .description('Connect a Google account (opens a loopback authorization) and store its token')
+    .option('--account <id>', 'account id to use; derived from the email when omitted')
+    .action(async (opts: { account?: string }) => {
       try {
-        const { config, dir } = deps.loadConfig();
-        if (!config.accounts.some((a) => a.id === opts.account)) {
-          const ids = config.accounts.map((a) => a.id).join(', ') || '(none)';
-          throw new Error(`Account "${opts.account}" is not in the config. Configured accounts: ${ids}`);
-        }
-        await deps.createAuthorizer(authPaths(config, dir)).authorizeInteractive(opts.account);
+        const { config, dir, present } = deps.loadConfig();
+        const authorizer = deps.createAuthorizer(authPaths(config, dir));
+        const session = await deps.openConnect({
+          config,
+          configDir: dir,
+          configPresent: present ?? true,
+          databaseUrl: deps.databaseUrl(),
+        });
         try {
-          await deps.reactivateAccount(deps.databaseUrl(), opts.account);
-        } catch (error) {
-          const reason = error instanceof Error ? error.message : String(error);
-          throw new Error(`Token saved, but the account could not be reactivated: ${reason}`);
+          const received = await authorizer.receiveAuthorizationCode((redirectUri) =>
+            session.begin('google', redirectUri),
+          );
+          const account = await session.complete('google', received, {
+            ...(opts.account !== undefined ? { accountId: opts.account } : {}),
+            createdVia: 'cli',
+          });
+          deps.out(`Token saved for ${account.id} (${account.email.address})`);
+        } finally {
+          await session.close();
         }
-        deps.out(`Token saved for ${opts.account}`);
       } catch (error) {
         fail(deps, error);
       }
@@ -156,15 +177,16 @@ export function defaultDeps(): CliDeps {
         await closeDb(db);
       }
     },
-    reactivateAccount: async (url, accountId) => {
-      const db = createDb(url);
-      try {
-        const accounts = new DrizzleAccountRepository(db);
-        const account = (await accounts.list()).find((a) => a.id === accountId);
-        if (account && account.status !== 'active') await accounts.setStatus(accountId, 'active');
-      } finally {
-        await closeDb(db);
-      }
+    openConnect: async (options) => {
+      const app = await NestFactory.createApplicationContext(SyncModule.forRoot(options), {
+        logger: new JsonLogger(stderrLogSink),
+      });
+      const connect = app.get<ConnectAccount>(TOKENS.ConnectAccount, { strict: false });
+      return {
+        begin: (kind, redirectUri) => connect.begin(kind, redirectUri),
+        complete: (kind, input, o) => connect.complete(kind, input, o),
+        close: () => app.close(),
+      };
     },
     openSync: async (options) => {
       const app = await NestFactory.createApplicationContext(SyncModule.forRoot(options), {
