@@ -2,7 +2,7 @@ import { TOKENS, type DailyBriefing, type GetDailyBriefing } from '@jarvis/core'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
-import { calendarContent, emailContent } from './external-content';
+import { emailContent } from './external-content';
 import { dateTime, eventLine, section, taskLine } from './format';
 import { wrapEventTitle } from './wrap';
 import { briefingEmailSchema, briefingEventSchema, briefingTaskSchema } from './schemas';
