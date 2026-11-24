@@ -1,4 +1,5 @@
 import { useSyncStatus } from '@/api/hooks';
+import { useNow } from '@/lib/use-now';
 
 /** Latest `lastSyncAt` across accounts, or null when nothing has synced yet. */
 export function latestSync(lastSyncs: (string | null)[]): Date | null {
@@ -14,6 +15,7 @@ export function syncLabel(last: Date | null, now: Date = new Date()): string {
 
 export function SyncIndicator() {
   const { data } = useSyncStatus();
+  const now = useNow();
   const last = latestSync((data?.accounts ?? []).map((a) => a.lastSyncAt));
-  return <span className="text-sm text-neutral-500">{syncLabel(last)}</span>;
+  return <span className="text-sm text-neutral-500">{syncLabel(last, now)}</span>;
 }

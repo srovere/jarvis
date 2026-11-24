@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Account, SetupStatus } from '@/api/client';
 import { server } from '@/test/server';
 import { App } from './app';
@@ -29,6 +29,8 @@ function mockApi(opts: { setup?: SetupStatus; accounts?: Account[]; lastSyncAt?:
   );
   return posts;
 }
+
+afterEach(() => vi.useRealTimers());
 
 const renderAt = (path: string) => render(<App router={createTestRouter([path])} />);
 
@@ -86,5 +88,39 @@ describe('app shell', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Sync now' }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0]).toEqual({ contentType: 'application/json', body: {} });
+  });
+
+  it('advances the sync label as time passes, without new data', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    mockApi({ lastSyncAt: new Date(Date.now() - 1000).toISOString() });
+    renderAt('/');
+    expect(await screen.findByText('synced 0 min ago')).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3 * 60_000);
+    });
+    expect(screen.getByText('synced 3 min ago')).toBeInTheDocument();
+  });
+
+  it('shows the server error when Sync now fails', async () => {
+    mockApi();
+    server.use(http.post('/api/sync', () => HttpResponse.json({ error: 'upstream unavailable' }, { status: 502 })));
+    renderAt('/');
+    await userEvent.click(await screen.findByRole('button', { name: 'Sync now' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('upstream unavailable');
+  });
+
+  it('lets the user retry when setup status fails to load', async () => {
+    mockApi();
+    let calls = 0;
+    server.use(
+      http.get('/api/setup/status', () => {
+        calls += 1;
+        return calls === 1 ? HttpResponse.json({ error: 'boom' }, { status: 500 }) : HttpResponse.json(ready);
+      }),
+    );
+    renderAt('/');
+    expect(await screen.findByRole('alert')).toHaveTextContent('boom');
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('heading', { name: 'Today' })).toBeInTheDocument();
   });
 });

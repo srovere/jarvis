@@ -38,6 +38,11 @@ export function Shell() {
           <Button size="sm" variant="outline" disabled={sync.isPending} onClick={() => sync.mutate()}>
             Sync now
           </Button>
+          {sync.isError && (
+            <span role="status" className="text-sm text-red-700">
+              {sync.error.message}
+            </span>
+          )}
         </header>
         <ReauthBanner />
         <div className="flex min-h-0 flex-1">
