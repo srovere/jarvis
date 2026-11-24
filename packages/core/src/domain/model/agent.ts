@@ -14,3 +14,8 @@ export interface AgentStatus {
 export const AGENT_PROVIDERS: ReadonlyArray<{ readonly kind: string; readonly label: string }> = [
   { kind: 'claude', label: 'Claude (subscription)' },
 ];
+
+/** Mail/calendar providers Jarvis can connect. */
+export const MAIL_PROVIDERS: ReadonlyArray<{ readonly kind: string; readonly label: string }> = [
+  { kind: 'google', label: 'Google (Gmail + Calendar)' },
+];

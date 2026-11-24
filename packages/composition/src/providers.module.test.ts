@@ -9,7 +9,7 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildGoogleAuth, ProvidersModule } from './providers.module';
-import { DB, JARVIS_CONFIG } from './tokens';
+import { DB, GOOGLE_CLIENT_STATUS, JARVIS_CONFIG, type GoogleClientStatus } from './tokens';
 
 const config: JarvisConfig = JarvisConfigSchema.parse({
   timezone: 'Europe/Madrid',
@@ -61,6 +61,13 @@ describe('ProvidersModule', () => {
       expect(module.get(token), name).toBeDefined();
     }
     expect(module.get(JARVIS_CONFIG)).toBe(config);
+    await module.close();
+  });
+
+  it('exposes the mail provider list and the Google client status', async () => {
+    const { module } = await compile();
+    expect(module.get(TOKENS.MailProviders)).toEqual([{ kind: 'google', label: 'Google (Gmail + Calendar)' }]);
+    expect(['present', 'missing']).toContain(await (module.get(GOOGLE_CLIENT_STATUS) as GoogleClientStatus).status());
     await module.close();
   });
 

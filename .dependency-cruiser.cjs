@@ -73,6 +73,14 @@ module.exports = {
       to: { path: ['^packages/composition/', '^@jarvis/composition', '(^|/)node_modules/@jarvis/composition'] },
     },
     {
+      name: 'apps-isolated',
+      comment:
+        'An app (worker, mcp-server, api) never imports another app; the api reaches mcp-server only through MCP (its tests may boot the server in-process).',
+      severity: 'error',
+      from: { path: '^apps/([^/]+)/', pathNot: TEST_FILES },
+      to: { path: '^apps/', pathNot: '^apps/$1/' },
+    },
+    {
       name: 'adapters-not-apps',
       comment: 'Adapters do not import apps.',
       severity: 'error',

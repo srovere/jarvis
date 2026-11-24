@@ -24,6 +24,7 @@ import { ClaudeCliRunner, FileAgentCredentialStore, FileAgentStatusStore } from 
 import type { JarvisConfig } from '@jarvis/config';
 import {
   AGENT_PROVIDERS,
+  MAIL_PROVIDERS,
   BlockFocusTime,
   CompleteTask,
   ConnectAccount,
@@ -68,7 +69,7 @@ import { preferencesFromConfig } from './app-settings';
 import { LayeredSettings } from './layered-settings';
 import { authPaths } from './paths';
 import { SystemClock } from './system-clock';
-import { DB, JARVIS_CONFIG, JARVIS_CONFIG_PRESENT, LOG_SINK, stderrLogSink } from './tokens';
+import { DB, GOOGLE_CLIENT_STATUS, JARVIS_CONFIG, JARVIS_CONFIG_PRESENT, LOG_SINK, stderrLogSink } from './tokens';
 
 export interface ProvidersModuleOptions {
   readonly config: JarvisConfig;
@@ -123,6 +124,8 @@ export class ProvidersModule implements OnApplicationShutdown {
       { provide: T.PersonLinkLookup, useClass: NullPersonLinkLookup },
       { provide: GOOGLE_AUTH, useFactory: () => buildGoogleAuth(config, configDir, process.env.JARVIS_DATA_DIR) },
       { provide: T.ProviderRegistry, useFactory: (g: GoogleAuth) => g.registry, inject: [GOOGLE_AUTH] },
+      { provide: GOOGLE_CLIENT_STATUS, useFactory: (g: GoogleAuth) => g.secrets, inject: [GOOGLE_AUTH] },
+      { provide: T.MailProviders, useValue: MAIL_PROVIDERS },
       { provide: T.AccountConnectors, useFactory: (g: GoogleAuth) => [g.connector], inject: [GOOGLE_AUTH] },
       construct(T.ConnectAccount, ConnectAccount, [T.AccountConnectors, T.AccountRepository, T.ProviderRegistry]),
       construct(T.RemoveAccount, RemoveAccount, [T.AccountConnectors, T.AccountRepository, T.ProviderRegistry]),
@@ -216,6 +219,8 @@ export interface GoogleAuth {
   readonly registry: ProviderRegistry;
   readonly connector: AccountConnector;
   readonly flow: GoogleOAuthFlow;
+  /** The uploaded OAuth client store (read through `GOOGLE_CLIENT_STATUS`). */
+  readonly secrets: GoogleClientSecretStore;
 }
 
 /**
@@ -234,5 +239,5 @@ export function buildGoogleAuth(config: JarvisConfig, configDir: string, dataDir
   const flow = new GoogleOAuthFlow(secrets, store);
   const registry = new ProviderRegistry();
   registry.register(new GoogleProviderFactory(flow, config.timezone));
-  return { registry, connector: new GoogleAccountConnector(secrets, store), flow };
+  return { registry, connector: new GoogleAccountConnector(secrets, store), flow, secrets };
 }
