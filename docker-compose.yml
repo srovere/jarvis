@@ -64,9 +64,12 @@ services:
       <<: *jarvis-env
       # Inside the container it must listen on all interfaces; the port published to the host is 127.0.0.1 only.
       JARVIS__MCP__BIND: 0.0.0.0
-    secrets: [pg_password, mcp_token]
+    # Live Google tools (drafts, focus blocks, tasks) need the OAuth client secret and the token
+    # volume. Read-write: a token refresh rewrites the token file (atomically, same uid as the worker).
+    secrets: [pg_password, mcp_token, google_oauth_client]
     volumes:
       - *jarvis-config
+      - jarvis_tokens:/data/tokens
     ports:
       - "127.0.0.1:3002:3002"
     healthcheck:
