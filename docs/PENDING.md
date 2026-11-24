@@ -26,7 +26,8 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
    draft and event only with explicit confirmation.
 3. ~~Merge `feat/jarvis-fase1` into `main`~~ — done on 2026-11-23 (without the final review; run it against `main`).
 4. **Documentation** (see next section).
-5. Next phases of the design: 2 Projects (local/SSH, discovery, people, task mirror) ·
+5. **Onboarding wizard** (see section below).
+6. Next phases of the design: 2 Projects (local/SSH, discovery, people, task mirror) ·
    3 Agent (Claude Code, highlights, meeting summaries, action approval) ·
    4 API + React dashboard + chat · 5 Analytics.
 
@@ -48,6 +49,19 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
       Google Cloud (with screenshots or detail for each screen), secrets and permissions, every
       `jarvis.config.yaml` key and `JARVIS__…` overrides, multiple accounts, day-to-day operation (logs,
       `sync --once`, re-authorizing), upgrades, Postgres backup/restore, moving to another machine, common problems.
+
+## Onboarding wizard
+
+A guided setup that replaces the manual README steps:
+
+- [ ] **Mail and calendar accounts** — choose the provider first (Google today; others later), then associate the
+      account (OAuth flow, calendars to sync) and write it to `jarvis.config.yaml`.
+- [ ] **AI agent subscription** — choose the provider first (Claude subscription via the `claude` CLI; never an API
+      key), then connect and verify it.
+- [ ] **Secrets generation** — create `secrets/mcp_token`, `secrets/pg_password` and place the OAuth client file,
+      with the right permissions/ownership for the containers.
+- [ ] **Rest of the setup** — the remaining steps from the installation guide (start the stack, connect the MCP
+      client, verify), plus documentation of the wizard itself.
 
 ## Technical items (for the final review)
 
