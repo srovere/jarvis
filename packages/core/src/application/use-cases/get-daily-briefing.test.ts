@@ -120,4 +120,62 @@ describe('GetDailyBriefing', () => {
     expect((await useCase().execute({ dateOffsetDays: 0 })).tasksDue).toEqual([]);
     expect((await useCase().execute({ dateOffsetDays: 1 })).tasksDue.map((t) => t.id)).toEqual(['tue']);
   });
+
+  describe('freeMinutes', () => {
+    const free = async (nowIso: string, offset = 0, overrides = {}) => {
+      f.clock.set(at(nowIso));
+      const uc = new GetDailyBriefing(
+        f.repos.accounts,
+        f.registry,
+        f.repos.mail,
+        f.repos.events,
+        f.repos.tasks,
+        new PriorityRules(f.repos.personLinks),
+        f.cleaner,
+        f.clock,
+        staticSettings(overrides),
+      );
+      return (await uc.execute({ dateOffsetDays: offset })).freeMinutes;
+    };
+
+    it('is the whole work day (9-19) on a work day before it starts, minus busy time', async () => {
+      await f.repos.events.applyChanges('a1', [
+        { kind: 'upsert', event: event('m1', 'a1', '2026-11-24T10:00:00', '2026-11-24T11:00:00') },
+        { kind: 'upsert', event: event('m2', 'a1', '2026-11-24T10:30:00', '2026-11-24T12:00:00') },
+      ]);
+      expect(await free('2026-11-24T07:00:00')).toBe(600 - 120);
+    });
+
+    it('counts from now when the work day is in progress, clipping events that started earlier', async () => {
+      await f.repos.events.applyChanges('a1', [
+        { kind: 'upsert', event: event('m1', 'a1', '2026-11-24T10:00:00', '2026-11-24T12:00:00') },
+        { kind: 'upsert', event: event('m2', 'a1', '2026-11-24T14:00:00', '2026-11-24T15:00:00') },
+      ]);
+      expect(await free('2026-11-24T11:00:00')).toBe(8 * 60 - 60 - 60);
+    });
+
+    it('is 0 once the work day is over and on a non-work day', async () => {
+      expect(await free('2026-11-24T20:00:00')).toBe(0);
+      expect(await free('2026-11-28T08:00:00')).toBe(0);
+    });
+
+    it('uses the whole work day for a future day and ignores declined, cancelled and non-blocking events', async () => {
+      await f.repos.events.applyChanges('a1', [
+        { kind: 'upsert', event: event('ok', 'a1', '2026-11-25T09:00:00', '2026-11-25T10:00:00') },
+        { kind: 'upsert', event: event('dec', 'a1', '2026-11-25T10:00:00', '2026-11-25T11:00:00', { myResponse: 'declined' }) },
+        { kind: 'upsert', event: event('can', 'a1', '2026-11-25T11:00:00', '2026-11-25T12:00:00', { status: 'cancelled' }) },
+        { kind: 'upsert', event: event('free', 'a1', '2026-11-25T12:00:00', '2026-11-25T13:00:00', { blocksTime: false }) },
+      ]);
+      expect(await free('2026-11-24T20:00:00', 1)).toBe(540);
+    });
+
+    it('only subtracts events of the account busy calendars', async () => {
+      await f.repos.events.applyChanges('a1', [
+        { kind: 'upsert', event: event('p', 'a1', '2026-11-24T09:00:00', '2026-11-24T10:00:00') },
+        { kind: 'upsert', event: event('o', 'a1', '2026-11-24T10:00:00', '2026-11-24T11:00:00', { calendarId: 'other' }) },
+      ]);
+      expect(await free('2026-11-24T07:00:00')).toBe(540);
+      expect(await free('2026-11-24T07:00:00', 0, { busyCalendars: { a1: ['primary', 'other'] } })).toBe(480);
+    });
+  });
 });

@@ -42,6 +42,7 @@ export class BriefingTools implements ToolGroup {
           events: z.array(briefingEventSchema),
           priorityEmails: z.array(briefingEmailSchema),
           tasksDue: z.array(briefingTaskSchema),
+          freeMinutes: z.number().int().min(0),
           accountsNeedingReauth: z.array(z.string()),
         },
       },

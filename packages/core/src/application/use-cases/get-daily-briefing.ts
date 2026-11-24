@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import { TimeRange } from '../../domain/model/time-range';
 import type { Account } from '../../domain/model/account';
 import type { EmailAddress } from '../../domain/model/email-address';
@@ -6,7 +7,7 @@ import type { Clock } from '../../domain/ports/clock';
 import type { AccountRepository, EventRepository, MailRepository, TaskRepository } from '../../domain/ports/repositories';
 import type { EmailCleaner } from '../../domain/services/email-cleaner';
 import type { PriorityRules } from '../../domain/services/priority-rules';
-import type { AppSettings, SettingsProvider } from '../config';
+import { busyCalendarsOf, type AppSettings, type SettingsProvider } from '../config';
 import type { ProviderRegistry } from '../provider-registry';
 import { isAttended, isoIn, toBriefingEvent, toBriefingTasks, type BriefingEmail, type DailyBriefing } from '../views';
 
@@ -49,8 +50,37 @@ export class GetDailyBriefing {
       events,
       priorityEmails: await this.priorityEmails(active, range, settings),
       tasksDue: toBriefingTasks(due, lists, zone),
+      freeMinutes: await this.freeMinutes(day, ids, settings),
       accountsNeedingReauth: all.filter((a) => a.status === 'needs_reauth').map((a) => a.id),
     };
+  }
+
+  /**
+   * Minutes of `day`'s work hours not covered by a busy event (busy calendars of the active accounts, the same
+   * events free-slot search avoids). Counted from now when the day is in progress; 0 on a non-work day or once over.
+   */
+  private async freeMinutes(day: DateTime, accountIds: string[], settings: AppSettings): Promise<number> {
+    const { zone, startHour, endHour, workDays } = settings.workSchedule;
+    if (!workDays.includes(day.setZone(zone).weekday)) return 0;
+    const local = day.setZone(zone);
+    const start = DateTime.max(local.set({ hour: startHour }), this.clock.now());
+    const end = local.set({ hour: endHour });
+    if (end <= start) return 0;
+    const window = new TimeRange(start, end);
+    const busy = (await this.events.inRange(accountIds, window))
+      .filter((e) => busyCalendarsOf(settings, e.accountId).includes(e.calendarId))
+      .filter((e) => e.blocksTime && e.status !== 'cancelled' && e.myResponse !== 'declined')
+      .map((e) => [Math.max(e.range.start.toMillis(), start.toMillis()), Math.min(e.range.end.toMillis(), end.toMillis())] as const)
+      .filter(([s, e]) => e > s)
+      .sort((a, b) => a[0] - b[0]);
+    let busyMs = 0;
+    let cursor = start.toMillis();
+    for (const [s, e] of busy) {
+      const from = Math.max(s, cursor);
+      if (e > from) busyMs += e - from;
+      cursor = Math.max(cursor, e);
+    }
+    return Math.round((window.durationMinutes() * 60_000 - busyMs) / 60_000);
   }
 
   /** Live own addresses; on any provider failure falls back to the account address (read-only: no status change). */

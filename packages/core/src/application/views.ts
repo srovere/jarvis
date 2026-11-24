@@ -48,6 +48,8 @@ export interface DailyBriefing {
   events: BriefingEvent[];
   priorityEmails: BriefingEmail[];
   tasksDue: BriefingTask[];
+  /** Free minutes within the day's work hours (from now if the day is in progress; 0 on a non-work day). */
+  freeMinutes: number;
   accountsNeedingReauth: string[];
 }
 

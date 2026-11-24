@@ -7,6 +7,7 @@ import { json, type NextFunction, type Request, type Response } from 'express';
 import { AccountsController } from './accounts.controller';
 import { AgentController } from './agent.controller';
 import { GoogleClientController } from './google-client.controller';
+import { DATA_CONTROLLERS } from './data.controller';
 import { ErrorFilter } from './http-errors';
 import { OAuthController } from './oauth.controller';
 import { SettingsController } from './settings.controller';
@@ -56,6 +57,7 @@ export class AppModule implements NestModule {
         OAuthController,
         SettingsController,
         AgentController,
+        ...DATA_CONTROLLERS,
       ],
       providers: [
         LocalOnlyGuard,
