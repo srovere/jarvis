@@ -81,6 +81,13 @@ module.exports = {
       to: { path: '^apps/', pathNot: '^apps/$1/' },
     },
     {
+      name: 'web-isolated',
+      comment: 'apps/web (browser code) imports no @jarvis/* package and nothing under packages/.',
+      severity: 'error',
+      from: { path: '^apps/web/' },
+      to: { path: ['^packages/', '^@jarvis/', '(^|/)node_modules/@jarvis/'] },
+    },
+    {
       name: 'adapters-not-apps',
       comment: 'Adapters do not import apps.',
       severity: 'error',
@@ -92,6 +99,6 @@ module.exports = {
     doNotFollow: { path: 'node_modules' },
     tsPreCompilationDeps: true,
     tsConfig: { fileName: 'tsconfig.base.json' },
-    exclude: { path: '(^|/)dist/' },
+    exclude: { path: '(^|/)(dist|node_modules)/' },
   },
 };

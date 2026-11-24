@@ -4,7 +4,14 @@ packages:
 allowBuilds:
   "@swc/core": true
   esbuild: true
+  # msw postinstall only copies the browser service worker; tests use the node server.
+  msw: false
   # testcontainers dependencies (dev only): they need no build scripts.
   cpu-features: false
   protobufjs: false
   ssh2: false
+minimumReleaseAgeExclude:
+  - "@types/react@19.3.1"
+  - lucide-react@1.79.0
+  - react-router-dom@7.18.7
+  - react-router@7.18.7
