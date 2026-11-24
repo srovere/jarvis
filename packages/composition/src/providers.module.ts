@@ -45,13 +45,15 @@ import { preferencesFromConfig } from './app-settings';
 import { LayeredSettings } from './layered-settings';
 import { authPaths } from './paths';
 import { SystemClock } from './system-clock';
-import { DB, JARVIS_CONFIG, LOG_SINK, stderrLogSink } from './tokens';
+import { DB, JARVIS_CONFIG, JARVIS_CONFIG_PRESENT, LOG_SINK, stderrLogSink } from './tokens';
 
 export interface ProvidersModuleOptions {
   readonly config: JarvisConfig;
   /** Directory of the configuration file; base of relative `secretsDir`/`dataDir`. */
   readonly configDir: string;
   readonly databaseUrl: string;
+  /** `false` when there is no YAML file: `config` then holds defaults and is not a settings layer. Default `true`. */
+  readonly configPresent?: boolean;
 }
 
 /** Providers bound to an explicit token (not bare classes), so they can be exported by token. */
@@ -74,8 +76,10 @@ export class ProvidersModule implements OnApplicationShutdown {
 
   static forRoot(options: ProvidersModuleOptions): DynamicModule {
     const { config, configDir, databaseUrl } = options;
+    const configPresent = options.configPresent ?? true;
     const providers: TokenProvider[] = [
       { provide: JARVIS_CONFIG, useValue: config },
+      { provide: JARVIS_CONFIG_PRESENT, useValue: configPresent },
       { provide: LOG_SINK, useValue: stderrLogSink },
       { provide: DB, useFactory: () => createDb(databaseUrl) },
       { provide: T.Clock, useClass: SystemClock },
@@ -84,7 +88,7 @@ export class ProvidersModule implements OnApplicationShutdown {
       {
         provide: T.SettingsProvider,
         useFactory: (store: SettingsStore, accounts: AccountRepository, clock: Clock) =>
-          new LayeredSettings(store, accounts, preferencesFromConfig(config), clock),
+          new LayeredSettings(store, accounts, configPresent ? preferencesFromConfig(config) : null, clock),
         inject: [T.SettingsStore, T.AccountRepository, T.Clock],
       },
       construct(T.SyncStateRepository, DrizzleSyncStateRepository, [DB]),

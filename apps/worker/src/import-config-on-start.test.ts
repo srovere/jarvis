@@ -10,11 +10,11 @@ const config = JarvisConfigSchema.parse({
   accounts: [{ id: 'personal', provider: 'google', email: 'me@example.com', calendars: ['primary', 'team'] }],
 });
 
-function setup() {
+function setup(configPresent = true) {
   const accounts = new InMemoryAccountRepository();
   const settings = new InMemorySettingsStore();
   const lines: string[] = [];
-  const hook = new ImportConfigOnStart(new ImportConfig(accounts, settings), config, (l) => lines.push(l));
+  const hook = new ImportConfigOnStart(new ImportConfig(accounts, settings), config, configPresent, (l) => lines.push(l));
   return { accounts, settings, lines, hook };
 }
 
@@ -25,6 +25,14 @@ describe('ImportConfigOnStart', () => {
     expect((await accounts.get('personal')).busyCalendars).toEqual(['primary', 'team']);
     expect((await settings.load())?.zone).toBe('Europe/Madrid');
     expect((await settings.load())?.sync.intervalMinutes).toBe(9);
+  });
+
+  it('imports nothing without a YAML file: no accounts and no settings row', async () => {
+    const { accounts, settings, lines, hook } = setup(false);
+    await hook.onModuleInit();
+    expect(await accounts.list()).toEqual([]);
+    expect(await settings.load()).toBeNull();
+    expect(lines).toEqual([]);
   });
 
   it('does not override dashboard edits on a later start, and warns once about the ignored accounts', async () => {

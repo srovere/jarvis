@@ -143,7 +143,7 @@ describe('jarvis sync --once', () => {
   it('syncs every active account, prints a JSON summary and closes the context', async () => {
     const { run, out, openSync, session, config } = setup();
     await run('sync', '--once');
-    expect(openSync).toHaveBeenCalledWith({ config, configDir: '/etc/jarvis', databaseUrl: 'postgres://db/jarvis' });
+    expect(openSync).toHaveBeenCalledWith({ config, configDir: '/etc/jarvis', configPresent: true, databaseUrl: 'postgres://db/jarvis' });
     expect(session.run).toHaveBeenCalledWith(undefined);
     expect(out.map((l) => JSON.parse(l))).toEqual([{ accounts: [{ accountId: 'personal', status: 'active', result: OK }] }]);
     expect(session.close).toHaveBeenCalled();

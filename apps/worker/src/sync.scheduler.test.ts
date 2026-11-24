@@ -161,4 +161,41 @@ describe('SyncScheduler', () => {
       vi.useRealTimers();
     }
   });
+
+  it('does not run requested syncs concurrently with a tick that starts while pending() is awaited', async () => {
+    const { scheduler, syncer, requests } = await setup([account('personal'), account('work')]);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    requests.ids = ['work'];
+    const pending = requests.pending.bind(requests);
+    requests.pending = async () => {
+      await gate;
+      return pending();
+    };
+    const poll = scheduler.poll();
+    const tick = scheduler.tick();
+    await vi.waitFor(() => expect(syncer.execute).toHaveBeenCalled());
+    release();
+    await poll;
+    await tick;
+    // The tick synced both accounts; the request was left pending, not run in parallel.
+    expect(syncer.execute.mock.calls).toEqual([['personal'], ['work']]);
+    expect(requests.ids).toEqual(['work']);
+  });
+
+  it('keeps syncing the other requested accounts when clearing one request fails', async () => {
+    const { scheduler, syncer, requests, lines } = await setup([account('personal'), account('work')]);
+    requests.ids = ['personal', 'work'];
+    const clear = requests.clear.bind(requests);
+    requests.clear = async (id) => {
+      if (id === 'personal') throw new Error('db down');
+      return clear(id);
+    };
+    await scheduler.poll();
+    expect(syncer.execute.mock.calls).toEqual([['personal'], ['work']]);
+    expect(requests.ids).toEqual(['personal']);
+    expect(lines.map((l) => JSON.parse(l))).toContainEqual(
+      expect.objectContaining({ msg: 'could not clear sync request', accountId: 'personal', error: 'db down' }),
+    );
+  });
 });

@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from './index';
+import { loadConfig, loadOptionalConfig } from './index';
 
 const dir = mkdtempSync(join(tmpdir(), 'jarvis-config-'));
 let counter = 0;
@@ -43,6 +43,19 @@ describe('loadConfig', () => {
   it('throws naming the path when the file is missing', () => {
     const missing = join(dir, 'nope.yaml');
     expect(() => loadConfig(missing, {})).toThrow(missing);
+  });
+
+  it('loadOptionalConfig uses the defaults and reports absence when the file is missing', () => {
+    const missing = join(mkdtempSync(join(tmpdir(), 'jarvis-cfg-')), 'absent.yaml');
+    const { config, present } = loadOptionalConfig(missing, {});
+    expect(present).toBe(false);
+    expect(config.accounts).toEqual([]);
+    expect(config.sync.intervalMinutes).toBe(loadConfig(write(''), {}).sync.intervalMinutes);
+  });
+
+  it('loadOptionalConfig reports presence and still fails loudly on a malformed file', () => {
+    expect(loadOptionalConfig(write(GOOGLE), {}).present).toBe(true);
+    expect(() => loadOptionalConfig(write('timezone: Mars/Olympus'), {})).toThrow(/invalid timezone/);
   });
 
   it('rejects startHour >= endHour with the workSchedule path', () => {

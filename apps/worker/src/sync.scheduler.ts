@@ -87,6 +87,8 @@ export class SyncScheduler implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.running) return;
     const ids = await this.requests.pending();
     if (ids.length === 0) return;
+    // `pending()` is async: a tick may have started meanwhile, and syncs must stay serial.
+    if (this.running) return;
     this.running = this.syncAccounts(ids).finally(() => {
       this.running = null;
     });
@@ -102,7 +104,12 @@ export class SyncScheduler implements OnApplicationBootstrap, OnModuleDestroy {
         const error = e instanceof Error ? e.message : String(e);
         this.log(JSON.stringify({ level: 'error', msg: 'requested sync failed', accountId: id, error }));
       }
-      await this.requests.clear(id);
+      try {
+        await this.requests.clear(id);
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        this.log(JSON.stringify({ level: 'error', msg: 'could not clear sync request', accountId: id, error }));
+      }
     }
   }
 

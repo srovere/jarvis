@@ -70,7 +70,20 @@ export function loadConfig(path: string, env: NodeJS.ProcessEnv): JarvisConfig {
   if (!existsSync(path)) {
     throw new Error(`Config file not found: ${path}`);
   }
-  const parsed: unknown = parse(readFileSync(path, 'utf8')) ?? {};
+  return parseConfig(path, env, true);
+}
+
+/**
+ * Like `loadConfig`, but the file is optional: when absent, the schema defaults (plus env overrides) are used and
+ * `present` is `false`. A file that exists but is malformed still throws.
+ */
+export function loadOptionalConfig(path: string, env: NodeJS.ProcessEnv): { config: JarvisConfig; present: boolean } {
+  const present = existsSync(path);
+  return { config: parseConfig(path, env, present), present };
+}
+
+function parseConfig(path: string, env: NodeJS.ProcessEnv, present: boolean): JarvisConfig {
+  const parsed: unknown = present ? (parse(readFileSync(path, 'utf8')) ?? {}) : {};
   if (!isRecord(parsed)) {
     throw new Error(`Invalid config file ${path}: top level must be a mapping`);
   }

@@ -20,12 +20,12 @@ const config: JarvisConfig = JarvisConfigSchema.parse({
   ],
 });
 
-async function compile() {
+async function compile(configPresent = true) {
   const repos = new InMemoryRepositories();
   const store = new InMemorySettingsStore();
   const end = vi.fn().mockResolvedValue(undefined);
   const module = await Test.createTestingModule({
-    imports: [ProvidersModule.forRoot({ config, configDir: '/etc/jarvis', databaseUrl: 'postgres://unused/db' })],
+    imports: [ProvidersModule.forRoot({ config, configDir: '/etc/jarvis', databaseUrl: 'postgres://unused/db', configPresent })],
   })
     .overrideProvider(DB)
     .useValue({ $client: { end } })
@@ -58,6 +58,13 @@ describe('ProvidersModule', () => {
       expect(module.get(token), name).toBeDefined();
     }
     expect(module.get(JARVIS_CONFIG)).toBe(config);
+    await module.close();
+  });
+
+  it('boots without a YAML file and resolves settings from the defaults, not the config layer', async () => {
+    const { module } = await compile(false);
+    const settings = module.get(TOKENS.SettingsProvider) as SettingsProvider;
+    expect((await settings.current()).sync.intervalMinutes).toBe(JarvisConfigSchema.parse({}).sync.intervalMinutes);
     await module.close();
   });
 

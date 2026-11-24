@@ -11,7 +11,7 @@ import {
   type AuthPaths,
   type ProvidersModuleOptions,
 } from '@jarvis/composition';
-import { loadConfig, type JarvisConfig } from '@jarvis/config';
+import { loadOptionalConfig, type JarvisConfig } from '@jarvis/config';
 import { NestFactory } from '@nestjs/core';
 import { Command } from 'commander';
 import { AccountSyncRunner, type AccountSyncOutcome } from '../account-sync-runner';
@@ -27,6 +27,8 @@ export interface LoadedConfig {
   readonly config: JarvisConfig;
   /** Directory of the config file; base for relative paths. */
   readonly dir: string;
+  /** `false` when there is no YAML file (`config` then holds the defaults). Default `true`. */
+  readonly present?: boolean;
 }
 
 /** A one-shot sync context (the Nest application context in production). */
@@ -100,8 +102,13 @@ export function buildProgram(deps: CliDeps): Command {
       let outcomes: AccountSyncOutcome[];
       try {
         if (!opts.once) throw new Error('Use "sync --once": periodic sync is done by the worker');
-        const { config, dir } = deps.loadConfig();
-        const session = await deps.openSync({ config, configDir: dir, databaseUrl: deps.databaseUrl() });
+        const { config, dir, present } = deps.loadConfig();
+        const session = await deps.openSync({
+          config,
+          configDir: dir,
+          configPresent: present ?? true,
+          databaseUrl: deps.databaseUrl(),
+        });
         try {
           outcomes = await session.run(opts.account);
         } finally {
@@ -135,7 +142,8 @@ export function defaultDeps(): CliDeps {
   return {
     loadConfig: () => {
       const path = resolve(defaultConfigPath(process.env, process.cwd()));
-      return { config: loadConfig(path, process.env), dir: dirname(path) };
+      const { config, present } = loadOptionalConfig(path, process.env);
+      return { config, dir: dirname(path), present };
     },
     createAuthorizer: ({ clientSecretPath, tokenDir }) =>
       new GoogleOAuthFlow(clientSecretPath, new FileTokenStore(tokenDir)),

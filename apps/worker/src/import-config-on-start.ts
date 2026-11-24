@@ -1,4 +1,4 @@
-import { JARVIS_CONFIG, LOG_SINK, preferencesFromConfig, type LogSink } from '@jarvis/composition';
+import { JARVIS_CONFIG, JARVIS_CONFIG_PRESENT, LOG_SINK, preferencesFromConfig, type LogSink } from '@jarvis/composition';
 import type { JarvisConfig } from '@jarvis/config';
 import { ImportConfig } from '@jarvis/core';
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
@@ -12,10 +12,13 @@ export class ImportConfigOnStart implements OnModuleInit {
   constructor(
     @Inject(ImportConfig) private readonly importConfig: ImportConfig,
     @Inject(JARVIS_CONFIG) private readonly config: JarvisConfig,
+    @Inject(JARVIS_CONFIG_PRESENT) private readonly configPresent: boolean,
     @Inject(LOG_SINK) private readonly log: LogSink,
   ) {}
 
   async onModuleInit(): Promise<void> {
+    // No YAML: import nothing, so no settings row is written and onboarding is not skipped.
+    if (!this.configPresent) return;
     const outcome = await this.importConfig.execute({
       preferences: preferencesFromConfig(this.config),
       accounts: this.config.accounts.map(({ id, provider, email, calendars }) => ({

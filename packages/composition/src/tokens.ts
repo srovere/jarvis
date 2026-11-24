@@ -1,6 +1,8 @@
 /** Composition-level tokens (adapter or config types that `core` must not know about). */
 export const DB = Symbol('Db');
 export const JARVIS_CONFIG = Symbol('JarvisConfig');
+/** `boolean`: whether a YAML configuration file exists (when not, `JARVIS_CONFIG` holds the schema defaults). */
+export const JARVIS_CONFIG_PRESENT = Symbol('JarvisConfigPresent');
 /** `(line: string) => void` sink for structured (JSON) log lines; stderr in production. */
 export const LOG_SINK = Symbol('LogSink');
 
