@@ -1,4 +1,4 @@
-import type { MailMessage } from "../model/mail";
+import type { MailMessage } from '../model/mail';
 
 export interface EmailCleanerOptions {
   maxChars?: number;
@@ -18,11 +18,11 @@ const MOBILE_SIGNATURE = /^(Enviado desde mi iPhone|Sent from my iPhone)\s*$/i;
 
 const NAMED_ENTITIES: Record<string, string> = {
   quot: '"',
-  amp: "&",
-  lt: "<",
-  gt: ">",
+  amp: '&',
+  lt: '<',
+  gt: '>',
   apos: "'",
-  nbsp: " ",
+  nbsp: ' ',
 };
 
 function decodeCodePoint(code: number, original: string): string {
@@ -51,25 +51,25 @@ export class EmailCleaner {
     this.htmlToText = opts.htmlToText;
   }
 
-  clean(m: Pick<MailMessage, "bodyText" | "bodyHtml" | "snippet">): string {
+  clean(m: Pick<MailMessage, 'bodyText' | 'bodyHtml' | 'snippet'>): string {
     const source = m.bodyText?.trim()
       ? m.bodyText
       : m.bodyHtml?.trim()
         ? this.htmlToText(m.bodyHtml)
-        : "";
+        : '';
     if (!source) return this.cleanSnippet(m.snippet);
 
-    const lines = source.replace(/\r\n?/g, "\n").split("\n");
+    const lines = source.replace(/\r\n?/g, '\n').split('\n');
     const kept = lines
       .slice(0, this.findCutIndex(lines))
       .filter(
         (line) =>
           !MOBILE_SIGNATURE.test(line.trim()) &&
-          !line.trimStart().startsWith(">"),
+          !line.trimStart().startsWith('>'),
       );
     const text = kept
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
       .trim();
 
     if (!text) return this.cleanSnippet(m.snippet);
@@ -84,7 +84,7 @@ export class EmailCleaner {
   private findCutIndex(lines: string[]): number {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (line.trimEnd() === "--") return i;
+      if (line.trimEnd() === '--') return i;
       const next = lines[i + 1];
       const single = line.trimEnd();
       const wrapped =
@@ -116,8 +116,8 @@ export class EmailCleaner {
     lines: string[],
     nextIndex: number,
   ): boolean {
-    if (header.includes("@")) return true;
-    const following = lines.slice(nextIndex).find((l) => l.trim() !== "");
-    return following !== undefined && following.trimStart().startsWith(">");
+    if (header.includes('@')) return true;
+    const following = lines.slice(nextIndex).find((l) => l.trim() !== '');
+    return following !== undefined && following.trimStart().startsWith('>');
   }
 }
