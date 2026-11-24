@@ -38,3 +38,15 @@ export class LayeredSettings implements SettingsProvider {
     };
   }
 }
+
+/** Preferences in effect: database row > YAML-derived preferences > schema defaults. */
+export class EffectivePreferences {
+  constructor(
+    private readonly store: SettingsStore,
+    private readonly yaml: Preferences | null,
+  ) {}
+
+  async load(): Promise<Preferences> {
+    return (await this.store.load()) ?? this.yaml ?? defaultPreferences();
+  }
+}

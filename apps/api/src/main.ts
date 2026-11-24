@@ -4,7 +4,7 @@ import { defaultConfigPath, JsonLogger, requireDatabaseUrl, stderrLogSink } from
 import { loadOptionalConfig } from '@jarvis/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { AppModule } from './app.module';
+import { API_APP_OPTIONS, AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
   const path = resolve(defaultConfigPath(process.env, process.cwd()));
@@ -13,6 +13,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(module, {
     logger: new JsonLogger(stderrLogSink),
     abortOnError: false,
+    ...API_APP_OPTIONS,
   });
   app.enableShutdownHooks();
   // 0.0.0.0 inside the container; compose publishes the port on 127.0.0.1 only.

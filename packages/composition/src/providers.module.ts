@@ -66,10 +66,11 @@ import {
   type Type,
 } from '@nestjs/common';
 import { preferencesFromConfig } from './app-settings';
-import { LayeredSettings } from './layered-settings';
+import { GoogleClientUpload } from './google-client-store';
+import { EffectivePreferences, LayeredSettings } from './layered-settings';
 import { authPaths } from './paths';
 import { SystemClock } from './system-clock';
-import { DB, GOOGLE_CLIENT_STATUS, JARVIS_CONFIG, JARVIS_CONFIG_PRESENT, LOG_SINK, stderrLogSink } from './tokens';
+import { DB, EFFECTIVE_PREFERENCES, GOOGLE_CLIENT_STATUS, GOOGLE_CLIENT_STORE, JARVIS_CONFIG, JARVIS_CONFIG_PRESENT, LOG_SINK, stderrLogSink } from './tokens';
 
 export interface ProvidersModuleOptions {
   readonly config: JarvisConfig;
@@ -116,6 +117,12 @@ export class ProvidersModule implements OnApplicationShutdown {
           new LayeredSettings(store, accounts, configPresent ? preferencesFromConfig(config) : null, clock),
         inject: [T.SettingsStore, T.AccountRepository, T.Clock],
       },
+      {
+        provide: EFFECTIVE_PREFERENCES,
+        useFactory: (store: SettingsStore) =>
+          new EffectivePreferences(store, configPresent ? preferencesFromConfig(config) : null),
+        inject: [T.SettingsStore],
+      },
       construct(T.SyncStateRepository, DrizzleSyncStateRepository, [DB]),
       construct(T.SyncRequests, DrizzleSyncRequests, [DB]),
       construct(T.MailRepository, DrizzleMailRepository, [DB]),
@@ -125,6 +132,7 @@ export class ProvidersModule implements OnApplicationShutdown {
       { provide: GOOGLE_AUTH, useFactory: () => buildGoogleAuth(config, configDir, process.env.JARVIS_DATA_DIR) },
       { provide: T.ProviderRegistry, useFactory: (g: GoogleAuth) => g.registry, inject: [GOOGLE_AUTH] },
       { provide: GOOGLE_CLIENT_STATUS, useFactory: (g: GoogleAuth) => g.secrets, inject: [GOOGLE_AUTH] },
+      { provide: GOOGLE_CLIENT_STORE, useFactory: (g: GoogleAuth) => new GoogleClientUpload(g.secrets), inject: [GOOGLE_AUTH] },
       { provide: T.MailProviders, useValue: MAIL_PROVIDERS },
       { provide: T.AccountConnectors, useFactory: (g: GoogleAuth) => [g.connector], inject: [GOOGLE_AUTH] },
       construct(T.ConnectAccount, ConnectAccount, [T.AccountConnectors, T.AccountRepository, T.ProviderRegistry]),

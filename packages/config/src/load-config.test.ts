@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadConfig, loadOptionalConfig } from './index';
+import { loadConfig, loadOptionalConfig, PreferencesSchema } from './index';
 
 const dir = mkdtempSync(join(tmpdir(), 'jarvis-config-'));
 let counter = 0;
@@ -132,5 +132,23 @@ describe('loadConfig', () => {
     const config = loadConfig(resolve(__dirname, '../../../jarvis.config.example.yaml'), {});
     expect(config.accounts).toEqual([]);
     expect(config.timezone).toBe('America/Argentina/Buenos_Aires');
+  });
+});
+
+describe('PreferencesSchema', () => {
+  const valid = {
+    zone: 'Europe/Madrid',
+    workSchedule: { startHour: 8, endHour: 17, workDays: [1, 2, 3] },
+    focus: { titlePrefix: '[F] ', horizonWorkDays: 3, defaultDurationMinutes: 60 },
+    sync: { intervalMinutes: 7, gmailInitialWindowDays: 30 },
+    briefing: { maxPriorityEmails: 4 },
+  };
+
+  it('accepts a complete document and rejects missing fields, bad zones and bad schedules', () => {
+    expect(PreferencesSchema.safeParse(valid).success).toBe(true);
+    expect(PreferencesSchema.safeParse({}).success).toBe(false);
+    expect(PreferencesSchema.safeParse({ ...valid, zone: 'Nope/Zone' }).success).toBe(false);
+    expect(PreferencesSchema.safeParse({ ...valid, workSchedule: { ...valid.workSchedule, endHour: 24 } }).success).toBe(false);
+    expect(PreferencesSchema.safeParse({ ...valid, workSchedule: { ...valid.workSchedule, workDays: [1, 1] } }).success).toBe(false);
   });
 });

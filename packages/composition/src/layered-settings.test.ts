@@ -2,7 +2,7 @@ import { EmailAddress, type Account, type Preferences } from '@jarvis/core';
 import { FixedClock, InMemoryRepositories, InMemorySettingsStore } from '@jarvis/core/testing';
 import { DateTime } from 'luxon';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { LayeredSettings } from './layered-settings';
+import { EffectivePreferences, LayeredSettings } from './layered-settings';
 import { defaultPreferences } from './app-settings';
 
 const yaml: Preferences = {
@@ -84,5 +84,15 @@ describe('LayeredSettings', () => {
     await repos.accounts.setBusyCalendars('a1', ['primary', 'team']);
     clock.advance({ seconds: 6 });
     expect((await provider.current()).busyCalendars).toEqual({ a1: ['primary', 'team'] });
+  });
+});
+
+describe('EffectivePreferences', () => {
+  it('prefers the database row, then YAML, then the defaults', async () => {
+    const store = new InMemorySettingsStore();
+    expect(await new EffectivePreferences(store, null).load()).toEqual(defaultPreferences());
+    expect(await new EffectivePreferences(store, yaml).load()).toEqual(yaml);
+    await store.save(db);
+    expect(await new EffectivePreferences(store, yaml).load()).toEqual(db);
   });
 });

@@ -52,11 +52,38 @@ const GoogleAccountSchema = z.object({
 // To support another provider, add its schema to this union discriminated by `provider`.
 const AccountSchema = z.discriminatedUnion('provider', [GoogleAccountSchema]);
 
+const TimezoneSchema = z.string().refine((tz) => IANAZone.isValidZone(tz), { message: 'invalid timezone' });
+
+/**
+ * Preferences as the dashboard submits them: every field required (no defaults), hours 0-23, valid IANA zone,
+ * `endHour > startHour`, non-empty unique ISO weekdays. Unknown keys (such as `agent`) are dropped.
+ */
+export const PreferencesSchema = z.object({
+  zone: TimezoneSchema,
+  workSchedule: z
+    .object({
+      startHour: z.number().int().min(0).max(23),
+      endHour: z.number().int().min(0).max(23),
+      workDays: z
+        .array(z.number().int().min(1).max(7))
+        .nonempty()
+        .refine((days) => new Set(days).size === days.length, { message: 'workDays must be unique' }),
+    })
+    .refine((s) => s.startHour < s.endHour, { message: 'startHour must be lower than endHour' }),
+  focus: z.object({
+    titlePrefix: z.string(),
+    horizonWorkDays: z.number().int().positive(),
+    defaultDurationMinutes: z.number().int().positive(),
+  }),
+  sync: z.object({
+    intervalMinutes: z.number().int().positive(),
+    gmailInitialWindowDays: z.number().int().positive(),
+  }),
+  briefing: z.object({ maxPriorityEmails: z.number().int().positive() }),
+});
+
 export const JarvisConfigSchema = z.object({
-  timezone: z
-    .string()
-    .refine((tz) => IANAZone.isValidZone(tz), { message: 'invalid timezone' })
-    .default('America/Argentina/Buenos_Aires'),
+  timezone: TimezoneSchema.default('America/Argentina/Buenos_Aires'),
   workSchedule: WorkScheduleSchema.prefault({}),
   focus: FocusSchema.prefault({}),
   sync: SyncSchema.prefault({}),

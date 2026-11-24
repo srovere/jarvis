@@ -16,3 +16,12 @@ export type LogSink = (line: string) => void;
 export const stderrLogSink: LogSink = (line) => {
   process.stderr.write(`${line}\n`);
 };
+
+/** Uploaded Google OAuth client: status plus validated save. Invalid files raise a `DomainError` with a safe message. */
+export const GOOGLE_CLIENT_STORE = Symbol('GoogleClientStore');
+export interface GoogleClientStore extends GoogleClientStatus {
+  save(json: string): Promise<void>;
+}
+
+/** `{ load(): Promise<Preferences> }`: preferences in effect (database > YAML > defaults). */
+export const EFFECTIVE_PREFERENCES = Symbol('EffectivePreferences');

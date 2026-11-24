@@ -11,7 +11,7 @@ import type { INestApplication } from '@nestjs/common';
 import { AbstractLoader, ExpressLoader } from '@nestjs/serve-static';
 import { Test } from '@nestjs/testing';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AppModule } from './app.module';
+import { API_APP_OPTIONS, AppModule } from './app.module';
 
 interface Reply {
   status: number;
@@ -103,7 +103,7 @@ describe('api app', () => {
       .overrideProvider(GOOGLE_CLIENT_STATUS)
       .useValue({ status: async () => world.googleClient ?? 'missing' })
       .compile();
-    app = module.createNestApplication();
+    app = module.createNestApplication(API_APP_OPTIONS);
     await app.listen(0, '127.0.0.1');
     return Number(new URL(await app.getUrl()).port);
   }
