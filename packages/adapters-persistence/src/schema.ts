@@ -42,6 +42,8 @@ export const accounts = pgTable('accounts', {
   statusDetail: text('status_detail'),
   calendarsBusy: text('calendars_busy').array().notNull().default(sql`'{primary}'::text[]`),
   missingScopes: text('missing_scopes').array().notNull().default(sql`'{}'::text[]`),
+  /** Set by `trigger_sync`; the worker syncs the account on its next poll and clears it. */
+  syncRequestedAt: tz('sync_requested_at'),
   createdVia: text('created_via').$type<'wizard' | 'config' | 'cli'>().notNull().default('config'),
   ...audit(),
 });

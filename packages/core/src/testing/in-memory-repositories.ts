@@ -16,6 +16,7 @@ import type {
   SyncStateRepository,
   TaskRepository,
 } from '../domain/ports/repositories';
+import type { SyncRequests } from '../domain/ports/sync-requests';
 import type { TaskChange } from '../domain/ports/tasks';
 
 /** Repositories that hold per-account synced data. */
@@ -82,8 +83,32 @@ export class InMemorySyncStateRepository implements SyncStateRepository {
     return this.state.get(`${accountId}|${resource}`)?.at ?? null;
   }
 
+  async latestRunAt(accountId: string): Promise<DateTime | null> {
+    let latest: DateTime | null = null;
+    for (const [key, { at }] of this.state) {
+      if (key.startsWith(`${accountId}|`) && (!latest || at > latest)) latest = at;
+    }
+    return latest;
+  }
+
   deleteAccountData(accountId: string): void {
     for (const key of [...this.state.keys()]) if (key.startsWith(`${accountId}|`)) this.state.delete(key);
+  }
+}
+
+export class InMemorySyncRequests implements SyncRequests {
+  private readonly ids = new Set<string>();
+
+  async pending(): Promise<string[]> {
+    return [...this.ids];
+  }
+
+  async clear(accountId: string): Promise<void> {
+    this.ids.delete(accountId);
+  }
+
+  async request(accountIds: string[]): Promise<void> {
+    for (const id of accountIds) this.ids.add(id);
   }
 }
 

@@ -27,6 +27,14 @@ export class DrizzleSyncStateRepository implements SyncStateRepository {
     return row?.lastRunAt ? fromDate(row.lastRunAt) : null;
   }
 
+  async latestRunAt(accountId: string): Promise<DateTime | null> {
+    const [row] = await this.db
+      .select({ at: sql<Date | null>`max(${syncState.lastRunAt})` })
+      .from(syncState)
+      .where(eq(syncState.accountId, accountId));
+    return row?.at ? fromDate(new Date(row.at)) : null;
+  }
+
   private async find(accountId: string, resource: string) {
     const [row] = await this.db
       .select()

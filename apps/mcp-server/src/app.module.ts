@@ -8,6 +8,7 @@ import { McpController } from './mcp.controller';
 import { BriefingTools } from './tools/briefing.tools';
 import { CalendarTools } from './tools/calendar.tools';
 import { EmailTools } from './tools/email.tools';
+import { SyncTools } from './tools/sync.tools';
 import { TasksTools } from './tools/tasks.tools';
 import { ToolRunner } from './tools/tool-runner';
 
@@ -27,6 +28,7 @@ export class AppModule {
         EmailTools,
         CalendarTools,
         TasksTools,
+        SyncTools,
         McpServerFactory,
         McpSessions,
       ],

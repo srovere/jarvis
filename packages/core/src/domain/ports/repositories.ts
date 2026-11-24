@@ -26,6 +26,8 @@ export interface SyncStateRepository {
   get(accountId: string, resource: string): Promise<string | null>;
   set(accountId: string, resource: string, cursor: string, at: DateTime): Promise<void>;
   lastRunAt(accountId: string, resource: string): Promise<DateTime | null>;
+  /** The most recent run over every resource of the account, or null when it never synced. */
+  latestRunAt(accountId: string): Promise<DateTime | null>;
 }
 
 export interface MailRepository {

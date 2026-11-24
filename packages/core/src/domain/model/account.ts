@@ -1,5 +1,8 @@
 import type { EmailAddress } from './email-address';
 
+/** OAuth scope that lets Jarvis list the account's calendars; without it only `primary` is known. */
+export const CALENDAR_LIST_SCOPE = 'https://www.googleapis.com/auth/calendar.calendarlist.readonly';
+
 export type ProviderKind = 'google' | (string & {});
 
 export interface Account {

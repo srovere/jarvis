@@ -49,6 +49,7 @@ describe('SearchEmails', () => {
     expect(results.map((r) => r.id)).toEqual(['n1', 'm2']);
     expect(results[1]).toEqual({
       id: 'm2',
+      accountId: 'a1',
       threadId: 't1',
       from: 'Ana <ana@client.com>',
       subject: 'Subject t1',

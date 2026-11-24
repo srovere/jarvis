@@ -5,5 +5,6 @@ export { DrizzleEventRepository } from './repositories/event.repository';
 export { DrizzleMailRepository } from './repositories/mail.repository';
 export { NullPersonLinkLookup } from './repositories/person-link.repository';
 export { DrizzleSettingsRepository } from './repositories/settings.repository';
+export { DrizzleSyncRequests } from './repositories/sync-requests.repository';
 export { DrizzleSyncStateRepository } from './repositories/sync-state.repository';
 export { DrizzleTaskRepository } from './repositories/task.repository';

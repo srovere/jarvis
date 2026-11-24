@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { BriefingTools } from './tools/briefing.tools';
 import { CalendarTools } from './tools/calendar.tools';
 import { EmailTools } from './tools/email.tools';
+import { SyncTools } from './tools/sync.tools';
 import { TasksTools } from './tools/tasks.tools';
 import type { ToolGroup } from './tools/tool-group';
 
@@ -11,8 +12,8 @@ import type { ToolGroup } from './tools/tool-group';
 export class McpServerFactory {
   private readonly groups: ToolGroup[];
 
-  constructor(briefing: BriefingTools, email: EmailTools, calendar: CalendarTools, tasks: TasksTools) {
-    this.groups = [briefing, email, calendar, tasks];
+  constructor(briefing: BriefingTools, email: EmailTools, calendar: CalendarTools, tasks: TasksTools, sync: SyncTools) {
+    this.groups = [briefing, email, calendar, tasks, sync];
   }
 
   create(): McpServer {

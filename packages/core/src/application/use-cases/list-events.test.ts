@@ -4,7 +4,7 @@ import { ListEvents } from './list-events';
 
 describe('ListEvents', () => {
   let f: UseCaseFixture;
-  const useCase = () => new ListEvents(f.repos.accounts, f.repos.events, staticSettings());
+  const useCase = () => new ListEvents(f.repos.accounts, f.repos.events, staticSettings(), f.clock);
 
   beforeEach(async () => {
     f = new UseCaseFixture();
@@ -28,6 +28,29 @@ describe('ListEvents', () => {
   it('interprets offset-less ISO in the configured zone', async () => {
     const got = await useCase().execute({ from: '2026-11-24T10:30:00', to: '2026-11-24T10:45:00' });
     expect(got.map((e) => e.id)).toEqual(['in']);
+  });
+
+  it('defaults to the next 7 days from today when from/to are omitted', async () => {
+    // Clock: Monday 2026-11-23 20:00 -> [11-23, 11-30): includes 11-24 and 11-26.
+    expect((await useCase().execute({})).map((e) => e.id)).toEqual(['in', 'out']);
+    expect((await useCase().execute({ from: '2026-11-25' })).map((e) => e.id)).toEqual(['out']);
+  });
+
+  it('defaults a missing from to 7 days before to', async () => {
+    expect((await useCase().execute({ to: '2026-11-25' })).map((e) => e.id)).toEqual(['in']);
+  });
+
+  it('rejects a range ending before it starts', async () => {
+    await expect(useCase().execute({ from: '2026-11-25', to: '2026-11-24' })).rejects.toThrow('"to" must not be before "from"');
+  });
+
+  it('returns nothing for an empty range (to equals from)', async () => {
+    expect(await useCase().execute({ from: '2026-11-24', to: '2026-11-24' })).toEqual([]);
+  });
+
+  it('rejects a range longer than 31 days', async () => {
+    await expect(useCase().execute({ from: '2026-11-01', to: '2026-12-03' })).rejects.toThrow('at most 31 days');
+    expect(await useCase().execute({ from: '2026-11-01', to: '2026-12-02' })).toBeDefined();
   });
 
   it('rejects an invalid date', async () => {

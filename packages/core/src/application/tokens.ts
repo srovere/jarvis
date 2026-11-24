@@ -31,5 +31,10 @@ export const TOKENS = {
   ConnectAgent: Symbol('ConnectAgent'),
   AgentRunners: Symbol('AgentRunners'),
   AgentProviders: Symbol('AgentProviders'),
+  SyncRequests: Symbol('SyncRequests'),
+  ListCalendars: Symbol('ListCalendars'),
+  ListTaskLists: Symbol('ListTaskLists'),
+  GetSyncStatus: Symbol('GetSyncStatus'),
+  RequestSync: Symbol('RequestSync'),
 } as const;
 

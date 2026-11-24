@@ -30,6 +30,9 @@ class FakeRequests implements SyncRequests {
   async clear(id: string) {
     this.ids = this.ids.filter((i) => i !== id);
   }
+  async request(ids: string[]) {
+    this.ids.push(...ids);
+  }
 }
 
 async function setup(accounts: Account[], execute: AccountSyncer['execute'] = vi.fn().mockResolvedValue(OK)) {

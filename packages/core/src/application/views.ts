@@ -33,6 +33,7 @@ export interface BriefingTask {
 
 export interface EmailResult {
   id: string;
+  accountId: string;
   threadId: string;
   from: string;
   subject: string;
@@ -95,6 +96,7 @@ export function toBriefingTasks(tasks: Task[], lists: TaskList[], zone: string):
 export function toEmailResult(m: MailMessage, cleaner: EmailCleaner, zone: string): EmailResult {
   return {
     id: m.id,
+    accountId: m.accountId,
     threadId: m.threadId,
     from: m.from.toString(),
     subject: m.subject,

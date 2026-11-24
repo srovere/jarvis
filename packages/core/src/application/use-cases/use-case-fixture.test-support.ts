@@ -59,7 +59,7 @@ export class UseCaseFixture {
 
   async addAccount(id: string, status: Account['status'] = 'active'): Promise<AccountProviders> {
     const email = EmailAddress.parse(`${id}@example.com`);
-    await this.repos.accounts.upsert({ id, provider: 'google', email, status });
+    await this.repos.accounts.upsert({ id, provider: 'google', email, status, busyCalendars: ['primary'], missingScopes: [], createdVia: 'config' });
     const mail = new InMemoryMailProvider({ accountId: id, own: [email] });
     const calendar = new InMemoryCalendarProvider({ accountId: id });
     const tasks = new InMemoryTasksProvider({ accountId: id, clock: this.clock });

@@ -13,9 +13,6 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { AccountSyncRunner } from './account-sync-runner';
 import { CatchUp } from './catch-up';
 
-/** Injection token of the `SyncRequests` source, bound by the worker's composition. */
-export const SYNC_REQUESTS = Symbol('SyncRequests');
-
 /** How often the worker looks for a changed sync interval and for accounts with a pending sync request. */
 export const POLL_MS = 30_000;
 
@@ -40,7 +37,7 @@ export class SyncScheduler implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(TOKENS.Clock) private readonly clock: Clock,
     @Inject(SchedulerRegistry) private readonly registry: SchedulerRegistry,
     @Inject(TOKENS.SettingsProvider) private readonly settings: SettingsProvider,
-    @Inject(SYNC_REQUESTS) private readonly requests: SyncRequests,
+    @Inject(TOKENS.SyncRequests) private readonly requests: SyncRequests,
     @Inject(LOG_SINK) private readonly log: LogSink,
   ) {}
 
