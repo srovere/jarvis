@@ -1,5 +1,5 @@
 import { JarvisConfigSchema } from '@jarvis/config';
-import { EmailAddress } from '@jarvis/core';
+import { activeAccounts, EmailAddress } from '@jarvis/core';
 import { InMemoryAccountRepository } from '@jarvis/core/testing';
 import { describe, expect, it } from 'vitest';
 import { ConfigAccountSeeder } from './config-account-seeder';
@@ -37,5 +37,26 @@ describe('ConfigAccountSeeder', () => {
       displayName: 'Trabajo',
       status: 'needs_reauth',
     });
+  });
+
+  it('disables accounts that are no longer in the config, so they are not synced nor picked as first active', async () => {
+    const repo = new InMemoryAccountRepository();
+    await repo.upsert({ id: 'removed', provider: 'google', email: EmailAddress.parse('old@x.example'), status: 'active' });
+    await repo.upsert({ id: 'stale', provider: 'google', email: EmailAddress.parse('s@x.example'), status: 'needs_reauth' });
+
+    await new ConfigAccountSeeder(repo, config).onModuleInit();
+
+    expect((await repo.get('removed')).status).toBe('disabled');
+    expect((await repo.get('stale')).status).toBe('disabled');
+    expect((await activeAccounts(repo)).map((a) => a.id)).toEqual(['personal', 'work']);
+  });
+
+  it('re-enables a disabled account that is back in the config', async () => {
+    const repo = new InMemoryAccountRepository();
+    await repo.upsert({ id: 'work', provider: 'google', email: EmailAddress.parse('new@work.example'), status: 'disabled' });
+
+    await new ConfigAccountSeeder(repo, config).onModuleInit();
+
+    expect((await repo.get('work')).status).toBe('active');
   });
 });
