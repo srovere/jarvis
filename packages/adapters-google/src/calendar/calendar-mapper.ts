@@ -28,6 +28,7 @@ export class CalendarMapper {
       title: e.summary ?? '',
       range: range.range,
       allDay: range.allDay,
+      blocksTime: e.transparency !== 'transparent' && e.eventType !== 'workingLocation',
       attendees,
       status: this.toStatus(e.status),
       raw: e,

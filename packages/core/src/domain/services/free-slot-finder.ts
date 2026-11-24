@@ -30,7 +30,7 @@ export class FreeSlotFinder {
     const now = q.now.setZone(zone);
     const roundedMs = Math.ceil(now.toMillis() / ROUND_MS) * ROUND_MS;
     const busy = q.busy
-      .filter((e) => e.status !== 'cancelled' && e.myResponse !== 'declined')
+      .filter((e) => e.blocksTime && e.status !== 'cancelled' && e.myResponse !== 'declined')
       .map((e) => e.range)
       .sort((a, b) => a.start.toMillis() - b.start.toMillis());
 

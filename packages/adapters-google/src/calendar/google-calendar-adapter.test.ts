@@ -67,6 +67,24 @@ describe('GoogleCalendarAdapter mapping', () => {
   });
 });
 
+describe('GoogleCalendarAdapter blocksTime', () => {
+  const timed = { start: { dateTime: '2026-11-24T10:00:00-03:00' }, end: { dateTime: '2026-11-24T11:00:00-03:00' } };
+
+  it.each([
+    ['opaque (default)', {}, true],
+    ['explicitly opaque', { transparency: 'opaque' }, true],
+    ['transparent ("free")', { transparency: 'transparent' }, false],
+    ['Workspace working location', { eventType: 'workingLocation' }, false],
+    ['out of office', { eventType: 'outOfOffice' }, true],
+    ['focus time', { eventType: 'focusTime' }, true],
+  ])('%s', async (_name, extra, blocks) => {
+    const { fake, adapter } = setup();
+    fake.seed('primary', { id: 'x', ...timed, ...extra });
+    const [e] = await adapter.listEvents(day, ['primary']);
+    expect(e!.blocksTime).toBe(blocks);
+  });
+});
+
 describe('GoogleCalendarAdapter robustness', () => {
   it('widens zero-length and negative events to one minute instead of aborting', async () => {
     const { fake, adapter } = setup();

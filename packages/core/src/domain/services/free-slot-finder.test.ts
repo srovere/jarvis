@@ -19,6 +19,7 @@ const event = (
   title: 'busy',
   range: new TimeRange(at(start), at(end)),
   allDay: false,
+  blocksTime: true,
   attendees: [],
   status: 'confirmed',
   ...overrides,
@@ -69,6 +70,14 @@ describe('FreeSlotFinder', () => {
       event('2026-11-23T00:00:00', '2026-11-24T00:00:00', { allDay: true }),
     ]);
     expect(r?.start.toISO()).toBe(at('2026-11-24T09:00:00').toISO());
+  });
+
+  it('ignores events that do not block time (free / transparent, working location)', () => {
+    const r = find('2026-11-23T08:00:00', [
+      event('2026-11-23T00:00:00', '2026-11-24T00:00:00', { allDay: true, blocksTime: false }),
+      event('2026-11-23T09:00:00', '2026-11-23T12:00:00', { blocksTime: false }),
+    ]);
+    expect(r?.start.toISO()).toBe(at('2026-11-23T09:00:00').toISO());
   });
 
   it('clips an event crossing midnight to the window', () => {

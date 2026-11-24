@@ -10,6 +10,8 @@ export interface CalendarEvent {
   title: string;
   range: TimeRange;
   allDay: boolean;
+  /** False for events that do not occupy the user's time: marked "free" (transparent) or working-location. */
+  blocksTime: boolean;
   attendees: { email: EmailAddress; response: EventResponse; self: boolean }[];
   myResponse?: EventResponse;
   videoLink?: string;

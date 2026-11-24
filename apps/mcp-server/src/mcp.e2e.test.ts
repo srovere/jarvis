@@ -96,6 +96,7 @@ async function seed() {
     title: 'Standup',
     range: new TimeRange(at('2026-11-23T10:00:00'), at('2026-11-23T10:30:00')),
     allDay: false,
+    blocksTime: true,
     attendees: [],
     status: 'confirmed',
   };
