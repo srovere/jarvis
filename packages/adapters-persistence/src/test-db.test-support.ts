@@ -16,7 +16,7 @@ export function useTestDb(): { db: () => Db } {
   });
 
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE accounts CASCADE`);
+    await db.execute(sql`TRUNCATE accounts, settings CASCADE`);
   });
 
   afterAll(async () => {
