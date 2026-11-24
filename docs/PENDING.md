@@ -22,14 +22,13 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
 1. ~~Final whole-branch review + fix round~~ — done and merged on 2026-11-24 (C1, C2, I1-I5 fixed).
    Re-check C1 (live Google tools from the `mcp-server` container) and C2 (re-authorization recovery) during the
    real-account verification.
-2. **Real verification with the Google account** following the README: Google Cloud project, secrets,
-   `jarvis.config.yaml`, `docker compose run … auth`, `docker compose up -d`, `claude mcp add …`. Create a test
-   draft and event only with explicit confirmation.
+2. **Phase 4a — dashboard + onboarding** (design approved 2026-11-24:
+   [`superpowers/specs/2026-11-24-jarvis-dashboard-onboarding-design.md`](superpowers/specs/2026-11-24-jarvis-dashboard-onboarding-design.md)).
+   It absorbs the onboarding wizard; real verification with the Google account happens through the wizard
+   (re-check C1 and C2 there). Create a test draft and event only with explicit confirmation.
 3. **Documentation** (see next section).
-4. **Onboarding wizard** (see section below).
-5. Next phases of the design: 2 Projects (local/SSH, discovery, people, task mirror) ·
-   3 Agent (Claude Code, highlights, meeting summaries, action approval) ·
-   4 API + React dashboard + chat · 5 Analytics.
+4. Next phases, in the new order: 3 Agent (Claude Code, highlights, meeting summaries, chat, action approval) ·
+   2 Projects (local/SSH, discovery, people, task mirror) · 5 Analytics.
 
 ## Pending documentation
 
@@ -50,7 +49,7 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
       `jarvis.config.yaml` key and `JARVIS__…` overrides, multiple accounts, day-to-day operation (logs,
       `sync --once`, re-authorizing), upgrades, Postgres backup/restore, moving to another machine, common problems.
 
-## Onboarding wizard
+## Onboarding wizard (part of phase 4a)
 
 A guided setup that replaces the manual README steps:
 
