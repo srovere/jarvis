@@ -16,7 +16,7 @@ const msg = (id: string, minutes: number): MailMessage => ({
 
 const event = (id: string, hours: number, calendarId = 'cal'): CalendarEvent => ({
   id, accountId: 'acc', calendarId, title: 'e',
-  range: new TimeRange(t0.plus({ hours }), t0.plus({ hours: hours + 1 })), allDay: false, attendees: [], status: 'confirmed',
+  range: new TimeRange(t0.plus({ hours }), t0.plus({ hours: hours + 1 })), allDay: false, blocksTime: true, attendees: [], status: 'confirmed',
 });
 
 const task = (id: string, extra: Partial<Task> = {}): Task => ({

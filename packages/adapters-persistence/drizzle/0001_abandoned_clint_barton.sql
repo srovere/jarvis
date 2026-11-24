@@ -1,0 +1,1 @@
+ALTER TABLE "events" ADD COLUMN "blocks_time" boolean DEFAULT true NOT NULL;

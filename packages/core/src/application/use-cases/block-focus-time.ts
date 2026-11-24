@@ -59,6 +59,7 @@ export class BlockFocusTime {
       title,
       range: slot,
       allDay: false,
+      blocksTime: true,
       attendees: [],
       myResponse: 'accepted',
       status: 'confirmed',

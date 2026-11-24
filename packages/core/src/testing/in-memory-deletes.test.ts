@@ -26,7 +26,7 @@ const thread = (messages: MailMessage[]): MailThread => ({
 });
 const event = (id: string): CalendarEvent => ({
   id, accountId: 'acc', calendarId: 'cal', title: 'e',
-  range: new TimeRange(t0, t0.plus({ hours: 1 })), allDay: false, attendees: [], status: 'confirmed',
+  range: new TimeRange(t0, t0.plus({ hours: 1 })), allDay: false, blocksTime: true, attendees: [], status: 'confirmed',
 });
 const task = (id: string): Task => ({
   id, accountId: 'acc', listId: 'l1', title: 't', status: 'open', updatedAt: t0, deleted: false,

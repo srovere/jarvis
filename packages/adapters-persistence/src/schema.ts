@@ -133,6 +133,7 @@ export const events = pgTable(
     startsAt: tz('starts_at').notNull(),
     endsAt: tz('ends_at').notNull(),
     allDay: boolean('all_day').notNull(),
+    blocksTime: boolean('blocks_time').notNull().default(true),
     status: text('status').$type<'confirmed' | 'tentative' | 'cancelled'>().notNull(),
     myResponse: text('my_response').$type<StoredAttendee['response']>(),
     attendees: jsonb('attendees').$type<StoredAttendee[]>().notNull(),

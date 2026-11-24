@@ -17,6 +17,7 @@ function ev(id: string, start: string, end: string, extra: Partial<CalendarEvent
     title: `Event ${id}`,
     range: new TimeRange(at(start), at(end)),
     allDay: false,
+    blocksTime: true,
     attendees: [],
     status: 'confirmed',
     ...extra,
@@ -85,6 +86,15 @@ describe('DrizzleEventRepository', () => {
     expect(got!.attendees[0]!.email.address).toBe('ana@example.com');
     expect(await repo.inRange(['work'], range)).toEqual([]);
     expect(await repo.inRange([], range)).toEqual([]);
+  });
+
+  it('round-trips blocksTime', async () => {
+    await repo.applyChanges('personal', [
+      { kind: 'upsert', event: ev('free', '2026-11-23T10:00:00Z', '2026-11-23T11:00:00Z', { blocksTime: false }) },
+      { kind: 'upsert', event: ev('busy', '2026-11-23T12:00:00Z', '2026-11-23T13:00:00Z') },
+    ]);
+    const got = await repo.inRange(['personal'], new TimeRange(at('2026-11-23T00:00:00Z'), at('2026-11-24T00:00:00Z')));
+    expect(got.map((e) => [e.id, e.blocksTime])).toEqual([['free', false], ['busy', true]]);
   });
 
   it('keeps the same event id in two calendars as separate rows and deletes per calendar', async () => {

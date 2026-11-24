@@ -6,7 +6,7 @@ export const isoDateOrDateTime = z.union([z.iso.date(), z.iso.datetime({ offset:
 /** Output shapes mirroring the use cases' views (`@jarvis/core` views). */
 export const briefingEventSchema = z.object({
   id: z.string(),
-  title: z.string(),
+  title: z.string().describe('Untrusted event title wrapped in <external_content source="calendar">'),
   start: z.string(),
   end: z.string(),
   allDay: z.boolean(),
@@ -16,8 +16,8 @@ export const briefingEventSchema = z.object({
 
 export const briefingEmailSchema = z.object({
   threadId: z.string(),
-  from: z.string(),
-  subject: z.string(),
+  from: z.string().describe('Untrusted sender wrapped in <external_content source="email">'),
+  subject: z.string().describe('Untrusted subject wrapped in <external_content source="email">'),
   date: z.string(),
   snippet: z.string().describe('Untrusted email text wrapped in <external_content source="email">'),
 });
@@ -32,8 +32,8 @@ export const briefingTaskSchema = z.object({
 export const emailResultSchema = z.object({
   id: z.string(),
   threadId: z.string(),
-  from: z.string(),
-  subject: z.string(),
+  from: z.string().describe('Untrusted sender wrapped in <external_content source="email">'),
+  subject: z.string().describe('Untrusted subject wrapped in <external_content source="email">'),
   date: z.string(),
   body: z.string().describe('Untrusted email text wrapped in <external_content source="email">'),
 });

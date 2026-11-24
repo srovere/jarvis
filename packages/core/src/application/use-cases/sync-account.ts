@@ -1,3 +1,4 @@
+import type { Account } from '../../domain/model/account';
 import { CursorExpired, ReauthRequired } from '../../domain/errors';
 import type { CalendarReader } from '../../domain/ports/calendar';
 import type { Clock } from '../../domain/ports/clock';
@@ -18,6 +19,8 @@ export type SyncResourceKind = 'mail' | 'calendar' | 'tasks';
 export type SyncResourceStatus = 'ok' | 'skipped' | 'error';
 
 export interface SyncAccountResult {
+  /** The account's status after the run: `needs_reauth` when its token was rejected. */
+  status: Account['status'];
   resources: Record<SyncResourceKind, SyncResourceStatus>;
   /** Resource keys (`mail`, `calendar:<id>`, `tasks:<listId>`) that went through a full resync. */
   fullResync: string[];
@@ -55,11 +58,12 @@ export class SyncAccount {
   ) {}
 
   async execute(accountId: string): Promise<SyncAccountResult> {
+    const account = await this.accounts.get(accountId);
     const result: SyncAccountResult = {
+      status: account.status,
       resources: { mail: 'skipped', calendar: 'skipped', tasks: 'skipped' },
       fullResync: [],
     };
-    const account = await this.accounts.get(accountId);
     try {
       const bundle = await this.registry.forAccount(account);
       for (const [kind, units] of this.plan(accountId, bundle)) {
@@ -69,7 +73,11 @@ export class SyncAccount {
       }
     } catch (e) {
       if (!(e instanceof ReauthRequired)) throw e;
+      // Drop the cached client: it holds the rejected token; after `jarvis auth` the next run reads the new one.
+      this.registry.invalidate(accountId);
       await this.accounts.setStatus(accountId, 'needs_reauth', `run pnpm jarvis auth --account ${accountId}`);
+      result.status = 'needs_reauth';
+      this.log(JSON.stringify({ level: 'warn', msg: 'account needs re-authorization', accountId, status: 'needs_reauth' }));
     }
     return result;
   }

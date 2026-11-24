@@ -93,7 +93,7 @@ describe('GmailAdapter drafts', () => {
   it('walks back to the last non-own sender when the last message is own and all recipients are own', async () => {
     const { fake, adapter } = setup({ sendAs: ['me@x.com', 'yo@gmail.com'] });
     fake.seed([
-      buildThread('t1', 'Nota', [
+      buildThread('t1', 'Note', [
         msg('m1', 0, { from: 'b@y.com', to: ['me@x.com'] }),
         msg('m2', 5, { from: 'me@x.com', to: ['yo@gmail.com'] }),
       ]),
@@ -104,7 +104,7 @@ describe('GmailAdapter drafts', () => {
 
   it('throws a DomainError when a self-only thread has no one to reply to', async () => {
     const { fake, adapter } = setup({ sendAs: ['me@x.com', 'yo@gmail.com'] });
-    fake.seed([buildThread('t1', 'Nota', [msg('m1', 0, { from: 'me@x.com', to: ['yo@gmail.com'] })])]);
+    fake.seed([buildThread('t1', 'Note', [msg('m1', 0, { from: 'me@x.com', to: ['yo@gmail.com'] })])]);
     await expect(adapter.createDraft({ threadId: 't1', body: 'x' })).rejects.toThrow(
       'No recipient to reply to in this thread',
     );

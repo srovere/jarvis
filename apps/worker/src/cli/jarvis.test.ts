@@ -9,13 +9,14 @@ class ExitCalled extends Error {
   }
 }
 
-const OK = { resources: { mail: 'ok', calendar: 'ok', tasks: 'skipped' }, fullResync: [] } as const;
+const OK = { status: 'active', resources: { mail: 'ok', calendar: 'ok', tasks: 'skipped' }, fullResync: [] } as const;
 
 function setup(authorize = vi.fn().mockResolvedValue(undefined)) {
   const created: unknown[] = [];
   const migrate = vi.fn().mockResolvedValue(undefined);
+  const reactivate = vi.fn().mockResolvedValue(undefined);
   const session = {
-    run: vi.fn().mockResolvedValue([{ accountId: 'personal', result: OK }]),
+    run: vi.fn().mockResolvedValue([{ accountId: 'personal', status: 'active', result: OK }]),
     close: vi.fn().mockResolvedValue(undefined),
   };
   const openSync = vi.fn().mockResolvedValue(session);
@@ -34,10 +35,11 @@ function setup(authorize = vi.fn().mockResolvedValue(undefined)) {
       return { authorizeInteractive: authorize };
     },
     databaseUrl: () => {
-      if (databaseUrl === undefined) throw new Error('Falta DATABASE_URL');
+      if (databaseUrl === undefined) throw new Error('Missing DATABASE_URL');
       return databaseUrl;
     },
     migrate,
+    reactivateAccount: reactivate,
     openSync,
     out: (m) => out.push(m),
     err: (m) => err.push(m),
@@ -47,7 +49,7 @@ function setup(authorize = vi.fn().mockResolvedValue(undefined)) {
   };
   const run = (...args: string[]) => buildProgram(deps).parseAsync(['node', 'jarvis', ...args]);
   const unsetDatabaseUrl = () => (databaseUrl = undefined);
-  return { run, out, err, authorize, created, migrate, openSync, session, config, unsetDatabaseUrl };
+  return { run, out, err, authorize, created, migrate, reactivate, openSync, session, config, unsetDatabaseUrl };
 }
 
 describe('jarvis auth', () => {
@@ -56,6 +58,26 @@ describe('jarvis auth', () => {
     await run('auth', '--account', 'personal');
     expect(authorize).toHaveBeenCalledWith('personal');
     expect(out).toEqual(['Token saved for personal']);
+  });
+
+  it('puts the account back to active in the database after storing the token', async () => {
+    const { run, out, reactivate } = setup();
+    await run('auth', '--account', 'personal');
+    expect(reactivate).toHaveBeenCalledWith('postgres://db/jarvis', 'personal');
+    expect(out).toEqual(['Token saved for personal']);
+  });
+
+  it('does not reactivate when authorization fails', async () => {
+    const { run, reactivate } = setup(vi.fn().mockRejectedValue(new Error('boom')));
+    await expect(run('auth', '--account', 'personal')).rejects.toMatchObject({ code: 1 });
+    expect(reactivate).not.toHaveBeenCalled();
+  });
+
+  it('exits 1 telling that the token was saved when the account cannot be reactivated', async () => {
+    const { run, err, reactivate } = setup();
+    reactivate.mockRejectedValue(new Error('connection refused'));
+    await expect(run('auth', '--account', 'personal')).rejects.toMatchObject({ code: 1 });
+    expect(err).toEqual(['Token saved, but the account could not be reactivated: connection refused']);
   });
 
   it('exits 1 listing configured ids for an unknown account', async () => {
@@ -98,7 +120,7 @@ describe('jarvis migrate', () => {
     const { run, out, migrate } = setup();
     await run('migrate');
     expect(migrate).toHaveBeenCalledWith('postgres://db/jarvis');
-    expect(out).toEqual(['Migraciones aplicadas']);
+    expect(out).toEqual(['Migrations applied']);
   });
 
   it('exits 1 with the error when DATABASE_URL is missing', async () => {
@@ -106,7 +128,7 @@ describe('jarvis migrate', () => {
     unsetDatabaseUrl();
     await expect(run('migrate')).rejects.toMatchObject({ code: 1 });
     expect(migrate).not.toHaveBeenCalled();
-    expect(err).toEqual(['Falta DATABASE_URL']);
+    expect(err).toEqual(['Missing DATABASE_URL']);
   });
 
   it('exits 1 when migrations fail', async () => {
@@ -123,7 +145,7 @@ describe('jarvis sync --once', () => {
     await run('sync', '--once');
     expect(openSync).toHaveBeenCalledWith({ config, configDir: '/etc/jarvis', databaseUrl: 'postgres://db/jarvis' });
     expect(session.run).toHaveBeenCalledWith(undefined);
-    expect(out.map((l) => JSON.parse(l))).toEqual([{ accounts: [{ accountId: 'personal', result: OK }] }]);
+    expect(out.map((l) => JSON.parse(l))).toEqual([{ accounts: [{ accountId: 'personal', status: 'active', result: OK }] }]);
     expect(session.close).toHaveBeenCalled();
   });
 
@@ -136,14 +158,14 @@ describe('jarvis sync --once', () => {
   it('exits 1 after printing the summary when an account failed', async () => {
     const { run, out, session } = setup();
     session.run.mockResolvedValue([
-      { accountId: 'personal', result: OK },
-      { accountId: 'work', error: 'boom' },
+      { accountId: 'personal', status: 'active', result: OK },
+      { accountId: 'work', status: 'active', error: 'boom' },
     ]);
     await expect(run('sync', '--once')).rejects.toMatchObject({ code: 1 });
     expect(JSON.parse(out[0] ?? '')).toEqual({
       accounts: [
-        { accountId: 'personal', result: OK },
-        { accountId: 'work', error: 'boom' },
+        { accountId: 'personal', status: 'active', result: OK },
+        { accountId: 'work', status: 'active', error: 'boom' },
       ],
     });
     expect(session.close).toHaveBeenCalled();
@@ -152,9 +174,29 @@ describe('jarvis sync --once', () => {
   it('exits 1 when a resource of an account failed', async () => {
     const { run, session } = setup();
     session.run.mockResolvedValue([
-      { accountId: 'personal', result: { ...OK, resources: { ...OK.resources, calendar: 'error' } } },
+      { accountId: 'personal', status: 'active', result: { ...OK, resources: { ...OK.resources, calendar: 'error' } } },
     ]);
     await expect(run('sync', '--once')).rejects.toMatchObject({ code: 1 });
+  });
+
+  it('exits 1 after printing the summary when an account needs re-authorization', async () => {
+    const { run, out, err, session } = setup();
+    session.run.mockResolvedValue([
+      { accountId: 'personal', status: 'active', result: OK },
+      { accountId: 'work', status: 'needs_reauth' },
+    ]);
+    await expect(run('sync', '--once')).rejects.toMatchObject({ code: 1 });
+    expect(JSON.parse(out[0] ?? '').accounts[1]).toEqual({ accountId: 'work', status: 'needs_reauth' });
+    expect(err.join('\n')).toContain('work');
+    expect(err.join('\n')).toContain('jarvis auth --account work');
+  });
+
+  it('exits 1 when no account is active', async () => {
+    const { run, out, err, session } = setup();
+    session.run.mockResolvedValue([]);
+    await expect(run('sync', '--once')).rejects.toMatchObject({ code: 1 });
+    expect(JSON.parse(out[0] ?? '')).toEqual({ accounts: [] });
+    expect(err).toEqual(['No active accounts to sync']);
   });
 
   it('reports a run failure on stderr, closes the context and exits 1', async () => {

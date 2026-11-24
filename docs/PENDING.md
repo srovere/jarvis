@@ -1,6 +1,6 @@
 # Jarvis — Pending work
 
-Status as of 2026-11-23. Merged into `main` (branch `feat/jarvis-fase1`).
+Status as of 2026-11-24. Phase 1 is merged into `main`; the final-review fixes are on `fix/phase1-final-review`.
 
 ## Where we are
 
@@ -8,7 +8,7 @@ Status as of 2026-11-23. Merged into `main` (branch `feat/jarvis-fase1`).
 [`superpowers/plans/2026-11-23-jarvis-phase1-foundation-google-mcp.md`](superpowers/plans/2026-11-23-jarvis-phase1-foundation-google-mcp.md)
 are done; each one passed a spec and quality review (with fix rounds where needed).
 
-- 348 tests passing; `pnpm lint:deps` with no violations; `pnpm typecheck` clean (after `pnpm build`).
+- 372 tests passing; `pnpm lint:deps` with no violations; `pnpm typecheck` clean (after `pnpm build`).
 - Verified in Docker (without a Google account): `db` healthy, `migrate` exits 0, `worker` up,
   `mcp-server` healthy, `/health` → `{"status":"ok"}`, `/mcp` without token → 401, with token it lists the 10 tools.
 - Verified against real Postgres: `jarvis migrate` and `jarvis sync --once`.
@@ -19,14 +19,16 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
 
 ## Next steps (in order)
 
-1. **Final whole-branch review** (most capable model) + a single fix round with whichever of the technical
-   items below are chosen to be fixed.
+1. ~~Final whole-branch review + fix round~~ — done on branch `fix/phase1-final-review` (C1, C2, I1-I5 fixed).
+   Re-check C1 (live Google tools from the `mcp-server` container) and C2 (re-authorization recovery) during the
+   real-account verification.
 2. **Real verification with the Google account** following the README: Google Cloud project, secrets,
    `jarvis.config.yaml`, `docker compose run … auth`, `docker compose up -d`, `claude mcp add …`. Create a test
    draft and event only with explicit confirmation.
 3. ~~Merge `feat/jarvis-fase1` into `main`~~ — done on 2026-11-23 (without the final review; run it against `main`).
 4. **Documentation** (see next section).
-5. Next phases of the design: 2 Projects (local/SSH, discovery, people, task mirror) ·
+5. **Onboarding wizard** (see section below).
+6. Next phases of the design: 2 Projects (local/SSH, discovery, people, task mirror) ·
    3 Agent (Claude Code, highlights, meeting summaries, action approval) ·
    4 API + React dashboard + chat · 5 Analytics.
 
@@ -49,24 +51,30 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
       `jarvis.config.yaml` key and `JARVIS__…` overrides, multiple accounts, day-to-day operation (logs,
       `sync --once`, re-authorizing), upgrades, Postgres backup/restore, moving to another machine, common problems.
 
+## Onboarding wizard
+
+A guided setup that replaces the manual README steps:
+
+- [ ] **Mail and calendar accounts** — choose the provider first (Google today; others later), then associate the
+      account (OAuth flow, calendars to sync) and write it to `jarvis.config.yaml`.
+- [ ] **AI agent subscription** — choose the provider first (Claude subscription via the `claude` CLI; never an API
+      key), then connect and verify it.
+- [ ] **Secrets generation** — create `secrets/mcp_token`, `secrets/pg_password` and place the OAuth client file,
+      with the right permissions/ownership for the containers.
+- [ ] **Rest of the setup** — the remaining steps from the installation guide (start the stack, connect the MCP
+      client, verify), plus documentation of the wizard itself.
+
 ## Technical items (for the final review)
 
 ### Priority
 
-- `jarvis sync --once` exits with code 0 when an account ends up `needs_reauth` (everything "skipped").
-  Include the account status in the summary and exit with an error.
-- README: troubleshooting suggests `chmod 644` for the secrets; prefer `chown 1000:1000` or `setfacl`, and
-  clarify the uid in step 2.
 - `pnpm typecheck` on a clean clone needs `pnpm build` first (types resolve from `dist`); test files are not
   type-checked (`tsconfig.test.json`). Fix the `InMemoryMailProvider.sync` arity this hides.
-- Accounts removed from the config stay `active` in the database and keep being synced.
-- MCP: sessions have no idle TTL (they grow until restart); email subject and sender are not marked as external
-  content; no 401 tests for GET/DELETE.
+- MCP: sessions have no idle TTL (they grow until restart); no 401 tests for GET/DELETE.
 - `ProvidersModule`: the positional `inject` loses type checking of the argument order.
 
 ### Minor
 
-- Style: `email-cleaner` files use double quotes (the rest use single quotes).
 - EmailCleaner: `&#0;` decodes to NUL; truncation can split surrogate pairs.
 - FreeSlotFinder: missing edge-case tests (unsorted events, `now` after end of day, weekend, exhausted horizon);
   no input validation.
@@ -77,6 +85,25 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
 - OAuth: non-constant-time `state` comparison; permissions of an existing token directory are not adjusted.
 - JSON logs without timestamp; the worker's `main.ts` imports the CLI module.
 - Worker has no Docker healthcheck.
+- Calendar: `listCalendars` uses `calendarList.list`, which the granted `calendar.events` scope does not cover (403
+  on first use); document it on the port or drop it.
+- Calendar config: the calendars that count as busy are also the only ones synced; "show in briefing but not busy"
+  is not possible (say so in `jarvis.config.example.yaml`).
+- Focus blocks are stored under `calendarId: 'primary'`; if the user lists the primary calendar by its real id the
+  local copy is never reconciled. Normalize `primary` or write to the first busy calendar.
+- `find_free_slot`/`block_focus_time`: the `preferred_start_hour` description promises earlier slots as a fallback
+  that `FreeSlotFinder` does not implement (fix the text or the behavior).
+- Task lists deleted in Google are never removed locally; their open tasks stay in `list_tasks` and the briefing.
+- `search_emails` results have no `accountId`, so the model cannot pass `account_id` to `read_thread` (matters with
+  several accounts); `create_gmail_draft` with a `thread_id` from a second account fails.
+- `search_emails`: the "latest message" of a thread can be the user's own unsent draft; skip `DRAFT`.
+- `.env.example` lists `MCP_BEARER_TOKEN`, which nothing reads (the server reads `mcp.tokenFile`); a local run
+  outside Docker needs `secretsDir`/`dataDir`/`tokenFile` overrides the README does not mention.
+- Draft link `#drafts?compose=<draftId>`: Gmail may expect the message id; check in the real-account verification.
+- Gmail full sync is all-or-nothing: a 403 `userRateLimitExceeded` restarts the whole 90-day fetch next tick.
+- An event shared by two busy calendars is listed twice in the briefing and in `list_events`.
+- Events stored before migration 0001 default to `blocks_time = true` until they change or a full resync rewrites
+  them.
 
 ## Decisions made during implementation (open to revision)
 

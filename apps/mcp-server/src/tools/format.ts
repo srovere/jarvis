@@ -10,6 +10,7 @@ export function time(iso: string): string {
   return DateTime.fromISO(iso, { setZone: true }).toFormat('HH:mm');
 }
 
+/** `title` is expected already wrapped as external content. */
 export function eventLine(e: BriefingEvent, sameDay = false): string {
   const when = e.allDay
     ? `${sameDay ? '' : `${e.start.slice(0, 10)} `}all day`
@@ -23,7 +24,7 @@ export function taskLine(t: BriefingTask): string {
   return `- ${t.title}${t.due ? ` (due ${t.due.slice(0, 10)})` : ''} — list ${t.list} [id ${t.id}]`;
 }
 
-/** `body` is expected already wrapped as external content. */
+/** `from`, `subject` and `body` are expected already wrapped as external content. */
 export function emailBlock(m: EmailResult): string {
   return `- ${dateTime(m.date)} From: ${m.from} — ${m.subject} [thread ${m.threadId}]\n${m.body}`;
 }

@@ -63,6 +63,7 @@ export class InMemoryCalendarProvider implements CalendarReader, EventWriter {
       title: e.title,
       range: e.range,
       allDay: false,
+      blocksTime: true,
       attendees: [],
       htmlLink,
       status: 'confirmed',

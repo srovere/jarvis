@@ -8,7 +8,7 @@ import { AccountSyncRunner, type AccountSyncer } from './account-sync-runner';
 import { SyncScheduler } from './sync.scheduler';
 
 const NOW = DateTime.fromISO('2026-11-23T10:00:00Z');
-const OK: SyncAccountResult = { resources: { mail: 'ok', calendar: 'ok', tasks: 'ok' }, fullResync: [] };
+const OK: SyncAccountResult = { status: 'active', resources: { mail: 'ok', calendar: 'ok', tasks: 'ok' }, fullResync: [] };
 
 function account(id: string, status: Account['status'] = 'active'): Account {
   return { id, provider: 'google', email: EmailAddress.parse(`${id}@example.com`), status };

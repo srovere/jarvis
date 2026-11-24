@@ -32,6 +32,7 @@ describe('SyncAccount', () => {
     const result = await useCase().execute('a1');
 
     expect(result).toEqual({
+      status: 'active',
       resources: { mail: 'ok', calendar: 'ok', tasks: 'ok' },
       fullResync: ['mail', 'calendar:primary', 'tasks:l1'],
     });
@@ -78,6 +79,28 @@ describe('SyncAccount', () => {
     expect(second.resources).toEqual({ mail: 'ok', calendar: 'ok', tasks: 'ok' });
     expect((await f.repos.accounts.get('a2')).status).toBe('active');
     expect((await f.repos.events.inRange(['a2'], week)).map((e) => e.id)).toEqual(['a2-e1']);
+  });
+
+  it('ReauthRequired logs a warn line with the accountId and drops the cached bundle', async () => {
+    const p = await seeded('a1');
+    const invalidate = vi.spyOn(f.registry, 'invalidate');
+    vi.spyOn(p.mail, 'sync').mockRejectedValue(new ReauthRequired('a1'));
+    await useCase().execute('a1');
+    expect(invalidate).toHaveBeenCalledWith('a1');
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(log.mock.calls[0]![0])).toEqual({
+      level: 'warn',
+      msg: 'account needs re-authorization',
+      accountId: 'a1',
+      status: 'needs_reauth',
+    });
+  });
+
+  it('result reports the account status', async () => {
+    await seeded('a1');
+    expect((await useCase().execute('a1')).status).toBe('active');
+    vi.spyOn(f.registry, 'forAccount').mockRejectedValue(new ReauthRequired('a1'));
+    expect((await useCase().execute('a1')).status).toBe('needs_reauth');
   });
 
   it('ReauthRequired from a later resource (tasks) also marks needs_reauth', async () => {

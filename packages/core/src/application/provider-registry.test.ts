@@ -37,6 +37,17 @@ describe('ProviderRegistry', () => {
     expect(create).toHaveBeenCalledTimes(2);
   });
 
+  it('invalidate drops the cached bundle so the next lookup builds a fresh one', async () => {
+    const create = vi.fn(async () => bundle());
+    const reg = new ProviderRegistry();
+    reg.register({ kind: 'google', create });
+    const first = await reg.forAccount(account('1'));
+    reg.invalidate('1');
+    const second = await reg.forAccount(account('1'));
+    expect(second).not.toBe(first);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects duplicate registration of a kind', () => {
     const reg = new ProviderRegistry();
     const f: ProviderFactory = { kind: 'google', create: async () => bundle() };

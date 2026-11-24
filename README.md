@@ -58,6 +58,10 @@ chmod 600 secrets/google-oauth-client.json
 cp jarvis.config.example.yaml jarvis.config.yaml
 ```
 
+The containers run as the `node` user (**uid 1000**). Compose bind-mounts the secrets with their host permissions, so
+they must be readable by uid 1000: if your host user is uid 1000 nothing else is needed; otherwise see
+*Permission denied reading secrets* under Troubleshooting (do not make the secrets world-readable).
+
 Edit `jarvis.config.yaml` and declare your accounts (`id` lowercase and unique):
 
 ```yaml
@@ -95,6 +99,11 @@ docker compose ps               # db and mcp-server healthy; migrate "exited (0)
 curl -s 127.0.0.1:3002/health   # {"status":"ok"}
 docker compose logs -f worker   # should show a full sync without errors
 ```
+
+`mcp-server` shares the `jarvis_tokens` volume and the OAuth client secret with the worker, because the live Google
+tools (`search_emails`, `read_thread`, `create_gmail_draft`, `block_focus_time`, `create_task`, `complete_task`) call
+Google directly. After `up`, ask Claude to run `search_emails` (step 5): if it answers "needs re-authorization",
+repeat step 3 for that account.
 
 To force a one-off sync (development, with `DATABASE_URL` pointing at the database):
 
@@ -141,16 +150,22 @@ pnpm lint:deps    # architecture rules (dependency-cruiser)
 
 ## Troubleshooting
 
-- **`needs_reauth` in the logs or the briefing:** the account's token was revoked or expired. Repeat step 3 for that
-  account (`auth --account <id>`).
+- **`needs_reauth` in the logs, the briefing or `sync --once`:** the account's token was revoked or expired (the log
+  line is `account needs re-authorization`). Repeat step 3 for that account (`auth --account <id>`). A successful
+  `auth` sets the account back to `active` in the database, and the running worker and mcp-server pick up the new
+  token on their next sync or tool call: no restart needed. `jarvis sync --once` exits non-zero while any account
+  needs re-authorization or none is active.
+- **An account removed from `jarvis.config.yaml`** is set to `disabled` on the next worker start (it is no longer
+  synced nor used for writes); adding it back re-enables it.
 - **Port 53682 in use:** free the port, or use another one with `-e JARVIS_OAUTH_PORT=53700` and publish that same
   port (`-p 127.0.0.1:53700:53700`).
 - **The token expires after 7 days:** the app is still in *Testing* mode; publish it to production (step 1.4) and
   re-authorize.
 - **`mcp-server` never becomes healthy:** check `docker compose logs mcp-server`; usually `secrets/mcp_token` or
   `jarvis.config.yaml` is missing. Compose requires the three `secrets/` files and the config to exist before `up`.
-- **Permission denied reading secrets:** on Linux hosts where your user is not uid 1000, the container's `node`
-  user cannot read someone else's `0600` files; use `chmod 644` on `secrets/*` (the directory stays git-ignored) or
-  change the owner.
+- **Permission denied reading secrets:** the containers run as uid 1000 (`node`). On Linux hosts where your user is
+  another uid, give that uid access without opening the files to everyone: `sudo chown 1000:1000 secrets/*` (keep
+  mode `600`), or keep your ownership and grant only uid 1000 read access with
+  `setfacl -m u:1000:r secrets/*` (and `setfacl -m u:1000:x secrets`). Do not use `chmod 644` on secrets.
 - **401 from the MCP client:** the header must be `Authorization: Bearer <exact contents of secrets/mcp_token>`.
 - Logs are structured JSON on stderr and never include email bodies or tokens.
