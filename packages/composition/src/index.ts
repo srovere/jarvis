@@ -6,3 +6,4 @@ export * from './providers.module';
 export * from './system-clock';
 export * from './tokens';
 export * from './layered-settings';
+export * from './google-client-store';

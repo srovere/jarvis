@@ -148,7 +148,9 @@ describe('PreferencesSchema', () => {
     expect(PreferencesSchema.safeParse(valid).success).toBe(true);
     expect(PreferencesSchema.safeParse({}).success).toBe(false);
     expect(PreferencesSchema.safeParse({ ...valid, zone: 'Nope/Zone' }).success).toBe(false);
-    expect(PreferencesSchema.safeParse({ ...valid, workSchedule: { ...valid.workSchedule, endHour: 24 } }).success).toBe(false);
+    expect(PreferencesSchema.safeParse({ ...valid, workSchedule: { ...valid.workSchedule, endHour: 24 } }).success).toBe(true);
+    expect(PreferencesSchema.safeParse({ ...valid, workSchedule: { ...valid.workSchedule, endHour: 25 } }).success).toBe(false);
+    expect(PreferencesSchema.safeParse({ ...valid, workSchedule: { ...valid.workSchedule, startHour: 24 } }).success).toBe(false);
     expect(PreferencesSchema.safeParse({ ...valid, workSchedule: { ...valid.workSchedule, workDays: [1, 1] } }).success).toBe(false);
   });
 });

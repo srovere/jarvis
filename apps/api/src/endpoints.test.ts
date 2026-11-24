@@ -2,7 +2,9 @@ import 'reflect-metadata';
 import { request, type IncomingHttpHeaders } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DB, EFFECTIVE_PREFERENCES, GOOGLE_CLIENT_STATUS, GOOGLE_CLIENT_STORE } from '@jarvis/composition';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { GoogleClientSecretStore } from '@jarvis/adapters-google';
+import { DB, EFFECTIVE_PREFERENCES, GOOGLE_CLIENT_STATUS, GOOGLE_CLIENT_STORE, GoogleClientUpload } from '@jarvis/composition';
 import { JarvisConfigSchema } from '@jarvis/config';
 import {
   ConnectAgent,
@@ -158,13 +160,16 @@ describe('api endpoints', () => {
   let clock: FixedClock;
   let clientSaved: string[];
   let clientPresent: boolean;
+  let clientDir: string | undefined;
 
   afterEach(async () => {
     await app?.close();
     app = undefined;
+    if (clientDir) rmSync(clientDir, { recursive: true, force: true });
+    clientDir = undefined;
   });
 
-  async function start(world: { accounts?: Account[]; preferences?: Preferences; yaml?: Preferences } = {}): Promise<number> {
+  async function start(world: { accounts?: Account[]; preferences?: Preferences; yaml?: Preferences; realClient?: boolean } = {}): Promise<number> {
     repos = new InMemoryRepositories();
     for (const a of world.accounts ?? []) await repos.accounts.upsert(a);
     settings = new InMemorySettingsStore();
@@ -176,6 +181,14 @@ describe('api endpoints', () => {
     clock = new FixedClock(DateTime.fromISO('2026-11-24T10:00:00Z', { zone: 'utc' }));
     clientSaved = [];
     clientPresent = false;
+    const fake = () => ({
+      status: async () => (clientPresent ? 'present' : 'missing'),
+      save: async (json: string) => {
+        if (!json.includes('installed')) throw new DomainError('The OAuth client file has no "installed" section');
+        clientSaved.push(json);
+        clientPresent = true;
+      },
+    });
     const module = await Test.createTestingModule({
       imports: [
         AppModule.forRoot({
@@ -210,14 +223,11 @@ describe('api endpoints', () => {
       .useFactory({ factory: () => ({ status: async () => (clientPresent ? 'present' : 'missing') }) })
       .overrideProvider(GOOGLE_CLIENT_STORE)
       .useFactory({
-        factory: () => ({
-          status: async () => (clientPresent ? 'present' : 'missing'),
-          save: async (json: string) => {
-            if (!json.includes('installed')) throw new DomainError('The OAuth client file has no "installed" section');
-            clientSaved.push(json);
-            clientPresent = true;
-          },
-        }),
+        factory: () => {
+          if (!world.realClient) return fake();
+          clientDir = mkdtempSync(join(tmpdir(), 'jarvis-api-gc-'));
+          return new GoogleClientUpload(new GoogleClientSecretStore({ dataDir: clientDir }));
+        },
       })
       .compile();
     app = module.createNestApplication(API_APP_OPTIONS);
@@ -316,6 +326,31 @@ describe('api endpoints', () => {
       expect(r.status).toBe(400);
       expect(r.json).toEqual({ error: 'The OAuth client file has no "installed" section' });
       expect(clientSaved).toEqual([]);
+    });
+
+    describe('with the real client store', () => {
+      const cases: Array<[string, string, RegExp]> = [
+        ['garbage', 'this is not json SECRETGARBAGE', /not valid JSON/],
+        ['a missing client_secret', JSON.stringify({ installed: { client_id: 'the-id-value' } }), /client_secret/],
+        ['a missing client_id', JSON.stringify({ installed: { client_secret: 'the-secret-value' } }), /client_id/],
+        ['a web client', JSON.stringify({ web: { client_id: 'the-id-value', client_secret: 'the-secret-value' } }), /web OAuth client/],
+      ];
+      it.each(cases)('answers 400 naming the problem for %s and stores nothing', async (_n, json, problem) => {
+        const port = await start({ realClient: true });
+        const r = await send(port, 'PUT', '/api/google/client', POST, JSON.stringify({ json }));
+        expect(r.status).toBe(400);
+        expect(r.json.error).toMatch(problem);
+        expect(r.body).not.toMatch(/SECRETGARBAGE|the-id-value|the-secret-value/);
+        expect(readdirSync(clientDir!)).toEqual([]);
+        expect((await send(port, 'GET', '/api/google/client')).json).toEqual({ status: 'missing' });
+      });
+
+      it('stores a valid client without returning its content', async () => {
+        const port = await start({ realClient: true });
+        const r = await send(port, 'PUT', '/api/google/client', POST, JSON.stringify({ json: GOOGLE_CLIENT_JSON }));
+        expect(r.status).toBe(204);
+        expect((await send(port, 'GET', '/api/google/client')).json).toEqual({ status: 'present' });
+      });
     });
 
     it('answers 400 when json is not a string', async () => {
@@ -496,6 +531,27 @@ describe('api endpoints', () => {
       expect((await repos.accounts.get('new')).status).toBe('active');
     });
 
+    it('reconnecting refreshes missing scopes, clears the status detail and keeps synced data', async () => {
+      const port = await start({
+        accounts: [account('new', 'needs_reauth', { statusDetail: 'Reconnect needed', missingScopes: ['old-scope'] })],
+      });
+      clientPresent = true;
+      await repos.syncState.set('new', 'gmail', 'cursor-1', clock.now());
+      connector.missing = ['https://www.googleapis.com/auth/tasks'];
+      await start302(port);
+      const r = await send(port, 'GET', '/api/oauth/google/callback?code=good&state=state-1');
+      expect(r.headers.location).toBe('/onboarding?connected=new');
+      const accounts = await repos.accounts.list();
+      expect(accounts).toHaveLength(1);
+      const reconnected = await repos.accounts.get('new');
+      expect(reconnected.id).toBe('new');
+      expect(reconnected.status).toBe('active');
+      expect(reconnected.missingScopes).toEqual(['https://www.googleapis.com/auth/tasks']);
+      expect(reconnected.statusDetail).toBeUndefined();
+      expect(await repos.syncState.get('new', 'gmail')).toBe('cursor-1');
+      expect(connector.saved).toEqual(['new']);
+    });
+
     it('purges expired entries so they cannot be used and do not accumulate', async () => {
       const port = await start();
       clientPresent = true;
@@ -540,13 +596,22 @@ describe('api endpoints', () => {
       expect(saved?.agent).toEqual(agent);
     });
 
+    it('accepts a work day ending at midnight and round-trips a YAML-derived endHour 24', async () => {
+      const yaml = { ...PREFS, workSchedule: { startHour: 9, endHour: 24, workDays: [1, 2, 3, 4, 5] } };
+      const port = await start({ yaml });
+      const got = await send(port, 'GET', '/api/settings');
+      expect(got.json.workSchedule.endHour).toBe(24);
+      expect((await send(port, 'PUT', '/api/settings', POST, JSON.stringify(got.json))).status).toBe(204);
+      expect((await settings.load())?.workSchedule.endHour).toBe(24);
+    });
+
     const bad: Array<[string, (p: any) => unknown]> = [
       ['an invalid time zone', (p) => ({ ...p, zone: 'Mars/Base' })],
       ['a missing field', ({ briefing: _b, ...rest }) => rest],
       ['a non-object body', () => [1]],
       ['startHour above 23', (p) => ({ ...p, workSchedule: { ...p.workSchedule, startHour: 24, endHour: 24 } })],
       ['a negative startHour', (p) => ({ ...p, workSchedule: { ...p.workSchedule, startHour: -1 } })],
-      ['endHour above 23', (p) => ({ ...p, workSchedule: { ...p.workSchedule, endHour: 24 } })],
+      ['endHour above 24', (p) => ({ ...p, workSchedule: { ...p.workSchedule, endHour: 25 } })],
       ['endHour equal to startHour', (p) => ({ ...p, workSchedule: { ...p.workSchedule, startHour: 9, endHour: 9 } })],
       ['endHour before startHour', (p) => ({ ...p, workSchedule: { ...p.workSchedule, startHour: 12, endHour: 9 } })],
       ['a fractional hour', (p) => ({ ...p, workSchedule: { ...p.workSchedule, startHour: 8.5 } })],

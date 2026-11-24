@@ -1,7 +1,8 @@
 import { IANAZone } from 'luxon';
 import { z } from 'zod';
 
-const hour = z.number().int().min(0).max(24);
+/** Hour of the day; `endHour: 24` means midnight. `startHour < endHour` keeps a start below 24. */
+export const hour = z.number().int().min(0).max(24);
 
 const WorkScheduleSchema = z
   .object({
@@ -55,15 +56,15 @@ const AccountSchema = z.discriminatedUnion('provider', [GoogleAccountSchema]);
 const TimezoneSchema = z.string().refine((tz) => IANAZone.isValidZone(tz), { message: 'invalid timezone' });
 
 /**
- * Preferences as the dashboard submits them: every field required (no defaults), hours 0-23, valid IANA zone,
+ * Preferences as the dashboard submits them: every field required (no defaults), hours 0-24 (24 = midnight), valid IANA zone,
  * `endHour > startHour`, non-empty unique ISO weekdays. Unknown keys (such as `agent`) are dropped.
  */
 export const PreferencesSchema = z.object({
   zone: TimezoneSchema,
   workSchedule: z
     .object({
-      startHour: z.number().int().min(0).max(23),
-      endHour: z.number().int().min(0).max(23),
+      startHour: hour,
+      endHour: hour,
       workDays: z
         .array(z.number().int().min(1).max(7))
         .nonempty()
