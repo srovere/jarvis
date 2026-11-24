@@ -11,7 +11,7 @@ function isRecord(value: unknown): value is RawObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Atraviesa wrappers (default/optional/prefault/pipe) hasta llegar al esquema base. */
+/** Unwraps wrappers (default/optional/prefault/pipe) down to the base schema. */
 function unwrap(schema: z.ZodType): z.ZodType {
   let current: z.ZodType = schema;
   for (;;) {

@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// Reemplaza a vitest.workspace.ts (deprecado en vitest 3.2): cada paquete tiene su propia config.
+// Replaces vitest.workspace.ts (deprecated in vitest 3.2): each package has its own config.
 export default defineConfig({
   test: { projects: ['packages/*', 'apps/*'] },
 });

@@ -105,12 +105,12 @@ async function seed() {
   calendar.seed([standup]);
   await repos.events.applyChanges('personal', [{ kind: 'upsert', event: standup }]);
 
-  const list = { id: 'l1', accountId: 'personal', title: 'Mis tareas', isDefault: true };
+  const list = { id: 'l1', accountId: 'personal', title: 'My tasks', isDefault: true };
   const report: Task = {
     id: 'k1',
     accountId: 'personal',
     listId: 'l1',
-    title: 'Enviar informe',
+    title: 'Send report',
     status: 'open',
     due: at('2026-11-23T00:00:00'),
     updatedAt: NOW,
@@ -296,15 +296,15 @@ describe('mcp-server (Streamable HTTP)', () => {
     const slot = await call(client, 'find_free_slot', { duration_minutes: 60, preferred_start_hour: 11 });
     expect(slot.structuredContent.slot).toEqual({ start: '2026-11-23T11:00:00.000-03:00', end: '2026-11-23T12:00:00.000-03:00' });
 
-    const focus = await call(client, 'block_focus_time', { task_name: 'Informe', duration_minutes: 60 });
+    const focus = await call(client, 'block_focus_time', { task_name: 'Report', duration_minutes: 60 });
     expect(focus.structuredContent).toMatchObject({ status: 'created', start: '2026-11-23T09:00:00.000-03:00' });
 
-    const created = await call(client, 'create_task', { title: 'Llamar a Ana', due: '2026-11-25' });
-    expect(created.structuredContent).toMatchObject({ title: 'Llamar a Ana', list: 'Mis tareas' });
+    const created = await call(client, 'create_task', { title: 'Call Ana', due: '2026-11-25' });
+    expect(created.structuredContent).toMatchObject({ title: 'Call Ana', list: 'My tasks' });
 
     const done = await call(client, 'complete_task', { task_id: 'k1' });
     expect(done.isError).toBeFalsy();
-    expect(done.structuredContent).toMatchObject({ id: 'k1', title: 'Enviar informe' });
+    expect(done.structuredContent).toMatchObject({ id: 'k1', title: 'Send report' });
   });
 
   it('rejects invalid arguments', async () => {

@@ -222,7 +222,7 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
     return out;
   }
 
-  // --- borradores -----------------------------------------------------------------------------
+  // --- drafts -----------------------------------------------------------------------------------
 
   private async fromAddress(own: EmailAddress[]): Promise<EmailAddress> {
     const list = await this.sendAsList();

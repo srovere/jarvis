@@ -61,7 +61,7 @@ export class FakeCalendar {
     if (cur) this.put(calendarId, { ...cur.event, status: 'cancelled' });
   }
 
-  /** Todo `syncToken` emitido hasta ahora pasa a responder 410. */
+  /** Every `syncToken` issued so far starts answering 410. */
   invalidateSyncTokens(): void {
     this.minValidRev = this.rev + 1;
     this.rev += 1;
