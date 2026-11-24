@@ -1,3 +1,4 @@
+export * from './account-connector';
 export * from './calendar';
 export * from './clock';
 export * from './identity';

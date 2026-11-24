@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GoogleOAuthFlow } from './google-oauth-flow';
 import { FileTokenStore } from './token-store';
 
+const resolveEmail = async (): Promise<string> => 'me@example.com';
 const SECRET = { installed: { client_id: 'cid', client_secret: 'csecret' } };
 
 describe('GoogleOAuthFlow', () => {
@@ -96,7 +97,7 @@ describe('GoogleOAuthFlow', () => {
       const getToken = vi
         .spyOn(OAuth2Client.prototype, 'getToken')
         .mockResolvedValue({ tokens: { refresh_token: 'r1', access_token: 'a1' } } as never);
-      const flow = new GoogleOAuthFlow(secretPath, store, { port: 0 });
+      const flow = new GoogleOAuthFlow(secretPath, store, { port: 0 }, resolveEmail);
       const done = flow.authorizeInteractive('personal');
       const url = await authUrl();
       expect(url.searchParams.get('access_type')).toBe('offline');
@@ -107,13 +108,14 @@ describe('GoogleOAuthFlow', () => {
       const res = await fetch(`${redirect.origin}/oauth2callback?code=abc&state=${url.searchParams.get('state')}`);
       expect(await res.text()).toContain('Done, you can close this tab.');
       await done;
-      expect(getToken).toHaveBeenCalledWith('abc');
+      expect(getToken).toHaveBeenCalledWith(expect.objectContaining({ code: 'abc', codeVerifier: expect.any(String) }));
+      expect(url.searchParams.get('code_challenge_method')).toBe('S256');
       expect(await store.read('personal')).toEqual({ refresh_token: 'r1', access_token: 'a1' });
     });
 
     it('rejects a callback with a wrong state and keeps waiting', async () => {
       vi.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({ tokens: { refresh_token: 'r1' } } as never);
-      const flow = new GoogleOAuthFlow(secretPath, store, { port: 0 });
+      const flow = new GoogleOAuthFlow(secretPath, store, { port: 0 }, resolveEmail);
       const done = flow.authorizeInteractive('personal');
       const url = await authUrl();
       const origin = new URL(url.searchParams.get('redirect_uri')!).origin;
@@ -125,7 +127,7 @@ describe('GoogleOAuthFlow', () => {
 
     it('fails clearly when Google returns no refresh_token', async () => {
       vi.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({ tokens: { access_token: 'a1' } } as never);
-      const flow = new GoogleOAuthFlow(secretPath, store, { port: 0 });
+      const flow = new GoogleOAuthFlow(secretPath, store, { port: 0 }, resolveEmail);
       const done = flow.authorizeInteractive('personal');
       const assertion = expect(done).rejects.toThrow(/refresh_token/);
       const url = await authUrl();
@@ -142,7 +144,7 @@ describe('GoogleOAuthFlow', () => {
       const port = (blocker.address() as import('node:net').AddressInfo).port;
       const clear = vi.spyOn(globalThis, 'clearTimeout');
       try {
-        const flow = new GoogleOAuthFlow(secretPath, store, { port });
+        const flow = new GoogleOAuthFlow(secretPath, store, { port }, resolveEmail);
         await expect(flow.authorizeInteractive('personal')).rejects.toThrow(/EADDRINUSE/);
         expect(clear).toHaveBeenCalled();
       } finally {
@@ -151,7 +153,7 @@ describe('GoogleOAuthFlow', () => {
     });
 
     it('times out with a clear error', async () => {
-      const flow = new GoogleOAuthFlow(secretPath, store, { port: 0, timeoutMs: 20 });
+      const flow = new GoogleOAuthFlow(secretPath, store, { port: 0, timeoutMs: 20 }, resolveEmail);
       await expect(flow.authorizeInteractive('personal')).rejects.toThrow(/Timed out/);
     });
   });

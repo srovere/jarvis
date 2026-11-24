@@ -1,5 +1,7 @@
 export * from './oauth/scopes';
 export * from './oauth/token-store';
+export * from './oauth/client-secret-store';
+export * from './oauth/google-account-connector';
 export * from './oauth/google-oauth-flow';
 export * from './gmail/gmail-adapter';
 export * from './gmail/mime-builder';

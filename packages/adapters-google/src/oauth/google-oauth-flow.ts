@@ -1,10 +1,9 @@
-import { randomBytes } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { ReauthRequired } from '@jarvis/core';
 import { OAuth2Client, type Credentials } from 'google-auth-library';
-import { GOOGLE_SCOPES } from './scopes';
+import { FileClientSecretReader, type ClientSecretReader } from './client-secret-store';
+import { GoogleAccountConnector, type EmailResolver } from './google-account-connector';
 import type { FileTokenStore } from './token-store';
 
 export interface GoogleOAuthFlowOptions {
@@ -18,19 +17,20 @@ export interface GoogleOAuthFlowOptions {
 
 const CALLBACK_PATH = '/oauth2callback';
 
-interface ClientSecret {
-  readonly client_id: string;
-  readonly client_secret: string;
-}
-
 export class GoogleOAuthFlow {
   private readonly options: GoogleOAuthFlowOptions;
+  private readonly secrets: ClientSecretReader;
+  private readonly connector: GoogleAccountConnector;
 
+  /** `clientSecret` is a path to a client file or any reader of the client credentials. */
   constructor(
-    private readonly clientSecretPath: string,
+    clientSecret: string | ClientSecretReader,
     private readonly store: FileTokenStore,
     options: Partial<GoogleOAuthFlowOptions> = {},
+    resolveEmail?: EmailResolver,
   ) {
+    this.secrets = typeof clientSecret === 'string' ? new FileClientSecretReader(clientSecret) : clientSecret;
+    this.connector = new GoogleAccountConnector(this.secrets, store, resolveEmail);
     this.options = {
       port: GoogleOAuthFlow.envPort(),
       bindHost: process.env.JARVIS_OAUTH_BIND ?? '127.0.0.1',
@@ -51,25 +51,22 @@ export class GoogleOAuthFlow {
 
   /** Authorizes an account via loopback: prints the URL to stderr, waits for the callback and stores the token. */
   async authorizeInteractive(accountId: string): Promise<void> {
-    const secret = await this.readClientSecret();
-    const state = randomBytes(16).toString('hex');
-    const { server, codePromise, cancelTimer } = this.listenForCallback(state);
+    await this.secrets.read(); // fail early on a missing or invalid client file
+    let expectedState = '';
+    const { server, codePromise, cancelTimer } = this.listenForCallback(() => expectedState);
     try {
       const port = await this.listening(server);
-      const client = new OAuth2Client(secret.client_id, secret.client_secret, `http://127.0.0.1:${port}${CALLBACK_PATH}`);
-      const url = client.generateAuthUrl({
-        access_type: 'offline',
-        prompt: 'consent',
-        scope: [...GOOGLE_SCOPES],
-        state,
-      });
-      process.stderr.write(`Open this URL in your browser to authorize account ${accountId}:\n${url}\n`);
+      const redirectUri = `http://127.0.0.1:${port}${CALLBACK_PATH}`;
+      const start = await this.connector.beginAuthorization({ redirectUri });
+      expectedState = start.state;
+      process.stderr.write(`Open this URL in your browser to authorize account ${accountId}:\n${start.url}\n`);
       const code = await codePromise;
-      const { tokens } = await client.getToken(code);
-      if (!tokens.refresh_token) {
-        throw new Error("Google returned no refresh_token; revoke the app's access in your Google account and retry");
-      }
-      await this.store.write(accountId, tokens);
+      const { credentials } = await this.connector.completeAuthorization({
+        code,
+        redirectUri,
+        verifier: start.verifier,
+      });
+      await this.connector.saveCredentials(accountId, credentials);
     } finally {
       cancelTimer();
       server.close();
@@ -81,8 +78,8 @@ export class GoogleOAuthFlow {
   async client(accountId: string): Promise<OAuth2Client> {
     const stored = await this.store.read(accountId);
     if (!stored) throw new ReauthRequired(accountId);
-    const secret = await this.readClientSecret();
-    const client = new OAuth2Client(secret.client_id, secret.client_secret);
+    const secret = await this.secrets.read();
+    const client = new OAuth2Client(secret.clientId, secret.clientSecret);
     client.setCredentials(stored);
     client.on('tokens', (fresh: Credentials) => {
       const merged = { ...stored, ...fresh, refresh_token: fresh.refresh_token ?? stored.refresh_token };
@@ -100,18 +97,6 @@ export class GoogleOAuthFlow {
     return stat ? `${stat.mtimeMs}:${stat.size}` : 'none';
   }
 
-  private async readClientSecret(): Promise<ClientSecret> {
-    const json = JSON.parse(await readFile(this.clientSecretPath, 'utf8')) as {
-      installed?: ClientSecret;
-      web?: ClientSecret;
-    } & Partial<ClientSecret>;
-    const secret = json.installed ?? json.web ?? (json as ClientSecret);
-    if (!secret.client_id || !secret.client_secret) {
-      throw new Error(`Invalid client secret in ${this.clientSecretPath}`);
-    }
-    return secret;
-  }
-
   private listening(server: Server): Promise<number> {
     return new Promise((resolve, reject) => {
       server.once('error', reject);
@@ -121,7 +106,7 @@ export class GoogleOAuthFlow {
     });
   }
 
-  private listenForCallback(state: string): { server: Server; codePromise: Promise<string>; cancelTimer: () => void } {
+  private listenForCallback(expectedState: () => string): { server: Server; codePromise: Promise<string>; cancelTimer: () => void } {
     let settle!: { resolve(code: string): void; reject(error: Error): void };
     const codePromise = new Promise<string>((resolve, reject) => {
       settle = { resolve, reject };
@@ -138,7 +123,7 @@ export class GoogleOAuthFlow {
       }
       const code = url.searchParams.get('code');
       const error = url.searchParams.get('error');
-      if (url.searchParams.get('state') !== state) {
+      if (url.searchParams.get('state') !== expectedState()) {
         res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' }).end('Invalid state');
         return; // does not consume the attempt: the legitimate callback may still arrive
       }

@@ -32,6 +32,11 @@ export class FileTokenStore {
     }
   }
 
+  /** Removes the token file; a missing one is not an error. */
+  async delete(accountId: string): Promise<void> {
+    await rm(this.fileFor(accountId), { force: true });
+  }
+
   /** Modification time (ms) and size of the token file, or `null` when there is none. */
   async stat(accountId: string): Promise<{ mtimeMs: number; size: number } | null> {
     try {
