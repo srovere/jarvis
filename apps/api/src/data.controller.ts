@@ -92,14 +92,13 @@ function gmailQuery(f: z.infer<typeof SearchQuery>): string {
 export class MailController {
   constructor(private readonly mcp: McpClientService) {}
 
-  /** `search_emails`. `accountId` narrows the results (the tool searches every active account). */
+  /** `search_emails`; `accountId` restricts the search to that account. */
   @Get('search')
   async search(@Query() query: unknown) {
     const f = parse(SearchQuery, query);
     const q = gmailQuery(f);
     if (!q) throw new BadRequestException({ error: 'Invalid request: give q, from, after or before' });
-    const result = await this.mcp.call<{ emails: Array<{ accountId: string }> }>('search_emails', { query: q, max_results: 20 });
-    return f.accountId === undefined ? result : { ...result, emails: result.emails.filter((e) => e.accountId === f.accountId) };
+    return this.mcp.call('search_emails', defined({ query: q, max_results: 20, account_id: f.accountId }));
   }
 
   /** `read_thread`. */
@@ -161,7 +160,7 @@ export class CalendarController {
 }
 
 const TasksQuery = z.object({ status: z.enum(['open', 'completed', 'all']).optional() });
-const CreateTaskBody = z.object({ title: z.string().trim().min(1), notes: z.string().optional(), due: z.iso.date().optional() });
+const CreateTaskBody = z.object({ title: z.string().trim().min(1), notes: z.string().optional(), due: z.iso.date().optional(), accountId: id.optional() });
 
 @Controller('api/tasks')
 export class TasksController {
@@ -184,14 +183,14 @@ export class TasksController {
   @Post()
   create(@Body() body: unknown) {
     const b = parse(CreateTaskBody, body);
-    return this.mcp.call('create_task', defined({ title: b.title, notes: b.notes, due: b.due }));
+    return this.mcp.call('create_task', defined({ title: b.title, notes: b.notes, due: b.due, account_id: b.accountId }));
   }
 
-  /** `complete_task`; the tool finds the task by id, so `accountId` only has to be well formed. */
+  /** `complete_task` in the account that owns the task. */
   @Post(':accountId/:taskId/complete')
   @HttpCode(200)
-  complete(@Param('taskId') taskId: string) {
-    return this.mcp.call('complete_task', { task_id: taskId });
+  complete(@Param('accountId') accountId: string, @Param('taskId') taskId: string) {
+    return this.mcp.call('complete_task', { task_id: taskId, account_id: accountId });
   }
 }
 

@@ -40,12 +40,13 @@ export class EmailTools implements ToolGroup {
         inputSchema: {
           query: z.string().min(1).describe('Gmail search query.'),
           max_results: z.number().int().min(1).max(20).default(5).describe('Maximum number of threads (1-20).'),
+          account_id: z.string().min(1).optional().describe('Only search this (active) account; default all.'),
         },
         outputSchema: { emails: z.array(emailResultSchema) },
       },
-      ({ query, max_results }) =>
+      ({ query, max_results, account_id }) =>
         this.runner.run('search_emails', async () => {
-          const emails = (await this.search.execute({ query, maxResults: max_results })).map(wrapEmail);
+          const emails = (await this.search.execute({ query, maxResults: max_results, ...(account_id !== undefined ? { accountId: account_id } : {}) })).map(wrapEmail);
           return {
             text: section(`Emails for "${query}"`, emails.map(emailBlock), 'matching emails'),
             structured: { emails },

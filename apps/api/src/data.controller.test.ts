@@ -19,10 +19,11 @@ import type { INestApplication } from '@nestjs/common';
 import { AbstractLoader, ExpressLoader } from '@nestjs/serve-static';
 import { Test } from '@nestjs/testing';
 import { DateTime } from 'luxon';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule as McpAppModule } from '../../mcp-server/src/app.module';
 import { API_APP_OPTIONS, AppModule } from './app.module';
 import { DATA_CONTROLLERS } from './data.controller';
+import { McpClientService } from './mcp-client.service';
 
 const ZONE = 'America/Argentina/Buenos_Aires';
 const TOKEN = 'data-test-token-0123456789';
@@ -82,6 +83,12 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
   let port: number;
   let repos: InMemoryRepositories;
   let syncRequests: InMemorySyncRequests;
+  /** Every tool call the API made, to assert that invalid requests never reach MCP. */
+  const calls: unknown[][] = [];
+
+  beforeEach(() => {
+    calls.length = 0;
+  });
 
   beforeAll(async () => {
     writeFileSync(join(dir, 'mcp_token'), `${TOKEN}\n`);
@@ -120,6 +127,25 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
     await repos.tasks.upsertLists('personal', [list]);
     await repos.tasks.applyChanges('personal', 'l1', [{ kind: 'upsert', task: report }]);
 
+    // A second active account whose only thread is older than everything in the first one, and one task.
+    await repos.accounts.upsert({ id: 'work', provider: 'google', email: EmailAddress.parse('work@example.com'), status: 'active', busyCalendars: ['primary'], missingScopes: [], createdVia: 'config' });
+    const old: MailMessage = { ...message('w1', 'tw', 'Old budget', NOW.minus({ days: 20 })), accountId: 'work' };
+    const workMail = new InMemoryMailProvider({ accountId: 'work', own: [EmailAddress.parse('work@example.com')] });
+    workMail.seed([{ id: 'tw', accountId: 'work', subject: old.subject, messages: [old], lastMessageAt: old.date, unread: false, labels: ['INBOX'] }]);
+    const workList = { id: 'wl', accountId: 'work', title: 'Work tasks', isDefault: true };
+    const workTask: Task = { id: 'wk1', accountId: 'work', listId: 'wl', title: 'Work item', status: 'open', updatedAt: NOW, deleted: false };
+    const workTasks = new InMemoryTasksProvider({ accountId: 'work', clock });
+    workTasks.seed([workList], [workTask]);
+    await repos.tasks.upsertLists('work', [workList]);
+    await repos.tasks.applyChanges('work', 'wl', [{ kind: 'upsert', task: workTask }]);
+    const workBundle: ProviderBundle = {
+      mail: workMail,
+      calendar: new InMemoryCalendarProvider({ accountId: 'work' }),
+      tasks: workTasks,
+      identity: workMail,
+      capabilities: { threads: true, replyHeaders: true, sendAsAliases: true, taskLists: true, incrementalSync: true },
+    };
+
     const bundle: ProviderBundle = {
       mail,
       calendar,
@@ -128,7 +154,7 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
       capabilities: { threads: true, replyHeaders: true, sendAsAliases: true, taskLists: true, incrementalSync: true },
     };
     const registry = new ProviderRegistry();
-    registry.register({ kind: 'google', create: async () => bundle });
+    registry.register({ kind: 'google', create: async (a: { id: string }) => (a.id === 'work' ? workBundle : bundle) });
 
     const mcpModule = await Test.createTestingModule({
       imports: [McpAppModule.forRoot({ config, configDir: dir, databaseUrl: 'postgres://unused/db' })],
@@ -183,6 +209,12 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
       .overrideProvider(EFFECTIVE_PREFERENCES)
       .useFactory({ factory: () => ({ load: async () => { throw new Error('unused'); } }) })
       .compile();
+    const mcpClient = apiModule.get(McpClientService);
+    const realCall = mcpClient.call.bind(mcpClient);
+    mcpClient.call = ((tool: string, args?: object) => {
+      calls.push([tool, args]);
+      return realCall(tool, args);
+    }) as typeof mcpClient.call;
     apiApp = apiModule.createNestApplication(API_APP_OPTIONS);
     await apiApp.listen(0, '127.0.0.1');
     port = Number(new URL(await apiApp.getUrl()).port);
@@ -212,14 +244,16 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
     it('searches emails, building the Gmail query from the filters, and keeps accountId', async () => {
       const r = await send(port, 'GET', '/api/mail/search?q=budget');
       expect(r.status).toBe(200);
-      expect(r.json.emails).toHaveLength(1);
-      expect(r.json.emails[0].accountId).toBe('personal');
+      expect(r.json.emails.map((e: { accountId: string }) => e.accountId).sort()).toEqual(['personal', 'work']);
     });
 
     it('filters by accountId', async () => {
-      const none = await send(port, 'GET', '/api/mail/search?q=budget&accountId=other');
-      expect(none.status).toBe(200);
-      expect(none.json).toEqual({ emails: [] });
+      const work = await send(port, 'GET', '/api/mail/search?q=budget&accountId=work');
+      expect(work.status).toBe(200);
+      expect(work.json.emails.map((e: { threadId: string }) => e.threadId)).toEqual(['tw']);
+      expect(calls[0]).toEqual(['search_emails', { query: 'budget', max_results: 20, account_id: 'work' }]);
+      const all = await send(port, 'GET', '/api/mail/search?q=budget');
+      expect(all.json.emails.map((e: { threadId: string }) => e.threadId).sort()).toEqual(['t1', 'tw']);
     });
 
     it('rejects a search with no criteria or a bad date without calling MCP', async () => {
@@ -227,6 +261,7 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
       const bad = await send(port, 'GET', '/api/mail/search?q=x&after=yesterday');
       expect(bad.status).toBe(400);
       expect(typeof bad.json.error).toBe('string');
+      expect(calls).toEqual([]);
     });
 
     it('reads a thread', async () => {
@@ -254,6 +289,7 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
       expect((await send(port, 'POST', '/api/mail/drafts', { to: ['a@b.com'] })).status).toBe(400);
       expect((await send(port, 'POST', '/api/mail/drafts', { body: 'x' })).status).toBe(400);
       expect((await send(port, 'POST', '/api/mail/drafts', { body: 'x', to: 'a@b.com' })).status).toBe(400);
+      expect(calls).toEqual([]);
     });
   });
 
@@ -295,7 +331,7 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
     it('lists tasks by status and rejects an unknown one', async () => {
       const open = await send(port, 'GET', '/api/tasks');
       expect(open.status).toBe(200);
-      expect(open.json.tasks.map((t: { id: string }) => t.id)).toEqual(['k1']);
+      expect(open.json.tasks.map((t: { id: string }) => t.id).sort()).toEqual(['k1', 'wk1']);
       expect((await send(port, 'GET', '/api/tasks?status=completed')).json).toEqual({ tasks: [] });
       expect((await send(port, 'GET', '/api/tasks?status=bogus')).status).toBe(400);
     });
@@ -315,6 +351,19 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
       expect((await send(port, 'POST', '/api/tasks', { title: 'x', due: 'soon' })).status).toBe(400);
     });
 
+    it('creates a task in the selected account', async () => {
+      const r = await send(port, 'POST', '/api/tasks', { title: 'Work thing', accountId: 'work' });
+      expect(r.status).toBe(201);
+      expect(r.json.list).toBe('Work tasks');
+    });
+
+    it('completes a task of the second account', async () => {
+      const r = await send(port, 'POST', '/api/tasks/work/wk1/complete', {});
+      expect(r.status).toBe(200);
+      expect(r.json.id).toBe('wk1');
+      expect(calls[0]).toEqual(['complete_task', { task_id: 'wk1', account_id: 'work' }]);
+    });
+
     it('completes a task', async () => {
       const r = await send(port, 'POST', '/api/tasks/personal/k1/complete', {});
       expect(r.status).toBe(200);
@@ -332,7 +381,7 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
     it('requests a sync of all accounts or of one', async () => {
       const all = await send(port, 'POST', '/api/sync', {});
       expect(all.status).toBe(200);
-      expect(all.json).toEqual({ requested: ['personal'] });
+      expect(all.json).toEqual({ requested: ['personal', 'work'] });
       const one = await send(port, 'POST', '/api/sync', { accountId: 'personal' });
       expect(one.json).toEqual({ requested: ['personal'] });
     });

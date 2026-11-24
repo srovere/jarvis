@@ -80,15 +80,17 @@ export class TasksTools implements ToolGroup {
           title: z.string().min(1).describe('Task title.'),
           notes: z.string().optional().describe('Optional details.'),
           due: z.iso.date().optional().describe('Due date, YYYY-MM-DD.'),
+          account_id: z.string().min(1).optional().describe('Account to create it in (active); default the first active account.'),
         },
         outputSchema: briefingTaskSchema.shape,
       },
-      ({ title, notes, due }) =>
+      ({ title, notes, due, account_id }) =>
         this.runner.run('create_task', async () => {
           const task = await this.create.execute({
             title,
             ...(notes !== undefined ? { notes } : {}),
             ...(due !== undefined ? { due } : {}),
+            ...(account_id !== undefined ? { accountId: account_id } : {}),
           });
           return { text: `Task created:\n${taskLine(task)}`, structured: task };
         }),
@@ -103,12 +105,15 @@ export class TasksTools implements ToolGroup {
         description:
           'Mark a task as completed, by the task id returned by list_tasks or get_daily_briefing. Use it when the ' +
           'user says a task is done. Without an account selection it searches the task in the first active account.',
-        inputSchema: { task_id: z.string().min(1).describe('Task id.') },
+        inputSchema: {
+          task_id: z.string().min(1).describe('Task id.'),
+          account_id: z.string().min(1).optional().describe('Account that owns the task (active); default the first active account.'),
+        },
         outputSchema: briefingTaskSchema.shape,
       },
-      ({ task_id }) =>
+      ({ task_id, account_id }) =>
         this.runner.run('complete_task', async () => {
-          const task = await this.complete.execute({ taskId: task_id });
+          const task = await this.complete.execute({ taskId: task_id, ...(account_id !== undefined ? { accountId: account_id } : {}) });
           return { text: `Task completed:\n${taskLine(task)}`, structured: task };
         }),
     );

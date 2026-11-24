@@ -58,4 +58,21 @@ describe('SearchEmails', () => {
     });
     expect(offList).not.toHaveBeenCalled();
   });
+
+  it('searches only the given account, even when another one would fill the top results', async () => {
+    const a2 = await f.addAccount('a2');
+    a1.mail.seed(Array.from({ length: 5 }, (_, i) => thread([message(`m${i}`, `t${i}`, 'a1', MONDAY_20.minus({ hours: i }))])));
+    a2.mail.seed([thread([message('n1', 'u1', 'a2', MONDAY_20.minus({ days: 30 }))])]);
+    const a1List = vi.spyOn(a1.mail, 'listThreads');
+
+    const results = await useCase().execute({ query: '', maxResults: 3, accountId: 'a2' });
+
+    expect(results.map((r) => r.threadId)).toEqual(['u1']);
+    expect(a1List).not.toHaveBeenCalled();
+  });
+
+  it('rejects an account that is not active', async () => {
+    await f.addAccount('off', 'needs_reauth');
+    await expect(useCase().execute({ query: 'x', accountId: 'off' })).rejects.toThrow(/not active/);
+  });
 });
