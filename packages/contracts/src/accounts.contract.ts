@@ -61,6 +61,17 @@ export function describeAccountsContract(name: string, setup: () => Promise<Acco
       });
     });
 
+    it('statusDetail round-trips and is cleared when the account is upserted active without one', async () => {
+      const { accounts } = await setup();
+      await accounts.upsert(account('personal', 'me@example.com'));
+      await accounts.setStatus('personal', 'needs_reauth', 'invalid_grant');
+      expect(await accounts.get('personal')).toMatchObject({ status: 'needs_reauth', statusDetail: 'invalid_grant' });
+      await accounts.upsert(account('personal', 'me@example.com', { status: 'active' }));
+      const after = await accounts.get('personal');
+      expect(after.status).toBe('active');
+      expect(after.statusDetail).toBeUndefined();
+    });
+
     it('setBusyCalendars and setMissingScopes round-trip', async () => {
       const { accounts } = await setup();
       await accounts.upsert(account('personal', 'me@example.com'));

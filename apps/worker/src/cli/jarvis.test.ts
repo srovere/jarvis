@@ -84,10 +84,12 @@ describe('jarvis auth', () => {
   });
 
   it('reports a missing DATABASE_URL before opening anything', async () => {
-    const { run, err, unsetDatabaseUrl, receive } = setup();
+    const { run, err, unsetDatabaseUrl, receive, openConnect, created } = setup();
     unsetDatabaseUrl();
     await expect(run('auth')).rejects.toMatchObject({ code: 1 });
     expect(err).toEqual(['Missing DATABASE_URL']);
+    expect(openConnect).not.toHaveBeenCalled();
+    expect(created).toEqual([]);
     expect(receive).not.toHaveBeenCalled();
   });
 

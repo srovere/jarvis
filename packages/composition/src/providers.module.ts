@@ -108,8 +108,9 @@ export class ProvidersModule implements OnApplicationShutdown {
       construct(T.EventRepository, DrizzleEventRepository, [DB]),
       construct(T.TaskRepository, DrizzleTaskRepository, [DB]),
       { provide: T.PersonLinkLookup, useClass: NullPersonLinkLookup },
-      { provide: T.ProviderRegistry, useFactory: () => googleRegistry(config, configDir) },
-      { provide: T.AccountConnectors, useFactory: () => [googleConnector(config, configDir)] },
+      { provide: GOOGLE_AUTH, useFactory: () => buildGoogleAuth(config, configDir, process.env.JARVIS_DATA_DIR) },
+      { provide: T.ProviderRegistry, useFactory: (g: GoogleAuth) => g.registry, inject: [GOOGLE_AUTH] },
+      { provide: T.AccountConnectors, useFactory: (g: GoogleAuth) => [g.connector], inject: [GOOGLE_AUTH] },
       construct(T.ConnectAccount, ConnectAccount, [T.AccountConnectors, T.AccountRepository, T.ProviderRegistry]),
       construct(T.RemoveAccount, RemoveAccount, [T.AccountConnectors, T.AccountRepository, T.ProviderRegistry]),
       construct(T.SetBusyCalendars, SetBusyCalendars, [T.AccountRepository]),
@@ -174,23 +175,29 @@ export class ProvidersModule implements OnApplicationShutdown {
   }
 }
 
-function googleRegistry(config: JarvisConfig, configDir: string): ProviderRegistry {
-  const { clientSecretPath, tokenDir } = authPaths(config, configDir);
-  const registry = new ProviderRegistry();
-  const oauth = new GoogleOAuthFlow(clientSecretPath, new FileTokenStore(tokenDir));
-  registry.register(new GoogleProviderFactory(oauth, config.timezone));
-  return registry;
+const GOOGLE_AUTH = Symbol('GoogleAuth');
+
+export interface GoogleAuth {
+  readonly registry: ProviderRegistry;
+  readonly connector: AccountConnector;
+  readonly flow: GoogleOAuthFlow;
 }
 
 /**
- * Google connector. The token directory follows the existing configuration (`dataDir/tokens`); the OAuth client is the
- * uploaded one under `JARVIS_DATA_DIR` (default `/data`) with the phase-1 `secretsDir/google_oauth_client` as fallback.
+ * Google auth wiring. The connector (browser authorization) and the registry's token flow (sync refresh) share one
+ * `GoogleClientSecretStore` and one token directory, so tokens are always refreshed with the client that issued them.
+ * Token dir follows the existing configuration (`dataDir/tokens`); the client is the uploaded one under
+ * `dataDirEnv` (default `/data`) with the phase-1 `secretsDir/google_oauth_client` as fallback.
  */
-function googleConnector(config: JarvisConfig, configDir: string): AccountConnector {
+export function buildGoogleAuth(config: JarvisConfig, configDir: string, dataDirEnv?: string): GoogleAuth {
   const { tokenDir } = authPaths(config, configDir);
   const secrets = new GoogleClientSecretStore({
-    dataDir: process.env.JARVIS_DATA_DIR?.trim() || '/data',
+    dataDir: dataDirEnv?.trim() || '/data',
     legacySecretsDir: resolve(configDir, config.secretsDir),
   });
-  return new GoogleAccountConnector(secrets, new FileTokenStore(tokenDir));
+  const store = new FileTokenStore(tokenDir);
+  const flow = new GoogleOAuthFlow(secrets, store);
+  const registry = new ProviderRegistry();
+  registry.register(new GoogleProviderFactory(flow, config.timezone));
+  return { registry, connector: new GoogleAccountConnector(secrets, store), flow };
 }

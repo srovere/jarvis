@@ -45,7 +45,8 @@ export class InMemoryAccountRepository implements AccountRepository {
 
   async setStatus(id: string, status: Account['status'], detail?: string): Promise<void> {
     const a = await this.get(id);
-    this.accounts.set(id, { ...a, status });
+    const { statusDetail: _old, ...rest } = a;
+    this.accounts.set(id, { ...rest, status, ...(detail !== undefined ? { statusDetail: detail } : {}) });
     this.statusDetails.set(id, detail);
   }
 

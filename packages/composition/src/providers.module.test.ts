@@ -5,7 +5,10 @@ import { FixedClock, InMemoryRepositories, InMemorySettingsStore } from '@jarvis
 import { Test } from '@nestjs/testing';
 import { DateTime } from 'luxon';
 import { describe, expect, it, vi } from 'vitest';
-import { ProvidersModule } from './providers.module';
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildGoogleAuth, ProvidersModule } from './providers.module';
 import { DB, JARVIS_CONFIG } from './tokens';
 
 const config: JarvisConfig = JarvisConfigSchema.parse({
@@ -117,5 +120,25 @@ describe('ProvidersModule', () => {
     expect(now).toBeGreaterThanOrEqual(before);
     expect(now).toBeLessThanOrEqual(Date.now());
     await module.close();
+  });
+});
+
+describe('buildGoogleAuth', () => {
+  it('uses the same OAuth client for browser authorization and for token refresh', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'jarvis-auth-'));
+    const dataDir = join(dir, 'data');
+    await mkdir(join(dataDir, 'google'), { recursive: true });
+    await writeFile(
+      join(dataDir, 'google', 'oauth-client.json'),
+      JSON.stringify({ installed: { client_id: 'uploaded-id', client_secret: 'uploaded-secret' } }),
+    );
+    const cfg = JarvisConfigSchema.parse({ dataDir: join(dir, 'tokens-root'), secretsDir: join(dir, 'secrets') });
+    const { connector, flow } = buildGoogleAuth(cfg, dir, dataDir);
+    const start = await connector.beginAuthorization({ redirectUri: 'http://127.0.0.1:1/cb' });
+    expect(new URL(start.url).searchParams.get('client_id')).toBe('uploaded-id');
+    await connector.saveCredentials('ana', { refresh_token: 'r' });
+    const client = await flow.client('ana');
+    expect(client._clientId).toBe('uploaded-id');
+    expect(client._clientSecret).toBe('uploaded-secret');
   });
 });

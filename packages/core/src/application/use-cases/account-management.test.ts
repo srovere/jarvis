@@ -93,6 +93,15 @@ describe('ConnectAccount', () => {
     expect(await repos.accounts.list()).toHaveLength(1);
   });
 
+  it('clears the stale status detail of a reconnected account', async () => {
+    const { connect, repos } = setup();
+    await connect.complete('google', input);
+    await repos.accounts.setStatus('ana', 'needs_reauth', 'invalid_grant');
+    const account = await connect.complete('google', input);
+    expect(account.statusDetail).toBeUndefined();
+    expect((await repos.accounts.get('ana')).statusDetail).toBeUndefined();
+  });
+
   it('creates no row and saves nothing when the connector fails', async () => {
     const { connect, connector, repos, invalidate } = setup();
     connector.fail = new Error('denied');

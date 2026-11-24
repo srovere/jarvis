@@ -12,5 +12,7 @@ export interface Account {
   busyCalendars: string[];
   /** Required OAuth scopes the user did not grant (empty when consent was complete). */
   missingScopes: string[];
+  /** Why the account is not `active` (e.g. the re-authorization hint); absent when active. */
+  statusDetail?: string;
   createdVia: 'wizard' | 'config' | 'cli';
 }

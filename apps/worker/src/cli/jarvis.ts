@@ -78,12 +78,13 @@ export function buildProgram(deps: CliDeps): Command {
     .action(async (opts: { account?: string }) => {
       try {
         const { config, dir, present } = deps.loadConfig();
+        const databaseUrl = deps.databaseUrl();
         const authorizer = deps.createAuthorizer(authPaths(config, dir));
         const session = await deps.openConnect({
           config,
           configDir: dir,
           configPresent: present ?? true,
-          databaseUrl: deps.databaseUrl(),
+          databaseUrl,
         });
         try {
           const received = await authorizer.receiveAuthorizationCode((redirectUri) =>
