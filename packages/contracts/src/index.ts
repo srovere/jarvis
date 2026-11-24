@@ -5,3 +5,4 @@ export * from './calendar.contract';
 export * from './tasks.contract';
 export * from './accounts.contract';
 export * from './settings.contract';
+export * from './agent-runner.contract';

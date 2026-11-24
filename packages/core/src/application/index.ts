@@ -18,5 +18,6 @@ export * from './use-cases/sync-account';
 export * from './use-cases/import-config';
 export * from './account-id';
 export * from './use-cases/connect-account';
+export * from './use-cases/connect-agent';
 export * from './use-cases/remove-account';
 export * from './use-cases/set-busy-calendars';

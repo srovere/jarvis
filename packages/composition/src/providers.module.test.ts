@@ -64,6 +64,13 @@ describe('ProvidersModule', () => {
     await module.close();
   });
 
+  it('exposes the Claude agent runner and the provider list', async () => {
+    const { module } = await compile();
+    expect((module.get(TOKENS.AgentRunners) as Array<{ kind: string }>).map((r) => r.kind)).toEqual(['claude']);
+    expect(module.get(TOKENS.AgentProviders)).toEqual([{ kind: 'claude', label: 'Claude (subscription)' }]);
+    await module.close();
+  });
+
   it('boots without a YAML file and resolves settings from the defaults, not the config layer', async () => {
     const { module } = await compile(false);
     const settings = module.get(TOKENS.SettingsProvider) as SettingsProvider;

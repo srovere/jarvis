@@ -1,4 +1,5 @@
 export * from './account-connector';
+export * from './agent';
 export * from './calendar';
 export * from './clock';
 export * from './identity';

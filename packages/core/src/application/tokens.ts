@@ -28,5 +28,8 @@ export const TOKENS = {
   ConnectAccount: Symbol('ConnectAccount'),
   RemoveAccount: Symbol('RemoveAccount'),
   SetBusyCalendars: Symbol('SetBusyCalendars'),
+  ConnectAgent: Symbol('ConnectAgent'),
+  AgentRunners: Symbol('AgentRunners'),
+  AgentProviders: Symbol('AgentProviders'),
 } as const;
 

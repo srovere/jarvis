@@ -1,3 +1,5 @@
+import type { AgentStatus } from './agent';
+
 /** User-editable preferences, persisted as one document. Plain data; `AppSettings` is derived from it. */
 export interface Preferences {
   /** IANA time zone every date is shown and computed in. */
@@ -11,4 +13,6 @@ export interface Preferences {
   focus: { titlePrefix: string; horizonWorkDays: number; defaultDurationMinutes: number };
   sync: { intervalMinutes: number; gmailInitialWindowDays: number };
   briefing: { maxPriorityEmails: number };
+  /** Agent connection outcome, when one was recorded alongside the preferences. */
+  agent?: AgentStatus;
 }

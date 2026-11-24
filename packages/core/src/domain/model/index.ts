@@ -5,3 +5,4 @@ export * from './mail';
 export * from './tasks';
 export * from './time-range';
 export * from './preferences';
+export * from './agent';

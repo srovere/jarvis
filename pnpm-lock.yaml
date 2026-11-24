@@ -280,6 +280,16 @@ importers:
         specifier: ^4.23.15
         version: 4.23.15
 
+  packages/adapters-claude:
+    dependencies:
+      '@jarvis/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@jarvis/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
   packages/adapters-google:
     dependencies:
       '@jarvis/core':
@@ -341,6 +351,9 @@ importers:
 
   packages/composition:
     dependencies:
+      '@jarvis/adapters-claude':
+        specifier: workspace:*
+        version: link:../adapters-claude
       '@jarvis/adapters-google':
         specifier: workspace:*
         version: link:../adapters-google

@@ -33,6 +33,21 @@ function isPreferences(v: unknown): v is Preferences {
   );
 }
 
+const AGENT_STATES = ['connected', 'failed', 'skipped'];
+
+/** Optional `agent` block; a malformed one is dropped instead of invalidating the whole row. */
+function isAgentStatus(v: unknown): boolean {
+  return (
+    isObject(v) &&
+    typeof v.status === 'string' &&
+    AGENT_STATES.includes(v.status) &&
+    typeof v.verifiedAt === 'string' &&
+    (v.provider === undefined || typeof v.provider === 'string') &&
+    (v.latencyMs === undefined || typeof v.latencyMs === 'number') &&
+    (v.reason === undefined || typeof v.reason === 'string')
+  );
+}
+
 export class DrizzleSettingsRepository implements SettingsStore {
   constructor(
     private readonly db: Db,
@@ -47,7 +62,8 @@ export class DrizzleSettingsRepository implements SettingsStore {
       this.log(JSON.stringify({ level: 'warn', msg: 'ignoring malformed settings row; using configuration defaults' }));
       return null;
     }
-    return row.data;
+    const { agent, ...rest } = row.data;
+    return agent === undefined || !isAgentStatus(agent) ? (rest as unknown as Preferences) : row.data;
   }
 
   async save(p: Preferences): Promise<void> {

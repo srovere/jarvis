@@ -19,11 +19,14 @@ import {
   GoogleProviderFactory,
   htmlToPlainText,
 } from '@jarvis/adapters-google';
+import { ClaudeCliRunner, FileAgentCredentialStore, FileAgentStatusStore } from '@jarvis/adapters-claude';
 import type { JarvisConfig } from '@jarvis/config';
 import {
+  AGENT_PROVIDERS,
   BlockFocusTime,
   CompleteTask,
   ConnectAccount,
+  ConnectAgent,
   CreateDraft,
   CreateTask,
   EmailCleaner,
@@ -42,6 +45,9 @@ import {
   TOKENS,
   type AccountConnector,
   type AccountRepository,
+  type AgentCredentialStore,
+  type AgentRunner,
+  type AgentStatusStore,
   type Clock,
   type SettingsStore,
 } from '@jarvis/core';
@@ -89,6 +95,7 @@ export class ProvidersModule implements OnApplicationShutdown {
   static forRoot(options: ProvidersModuleOptions): DynamicModule {
     const { config, configDir, databaseUrl } = options;
     const configPresent = options.configPresent ?? true;
+    const dataDir = () => process.env.JARVIS_DATA_DIR?.trim() || '/data';
     const providers: TokenProvider[] = [
       { provide: JARVIS_CONFIG, useValue: config },
       { provide: JARVIS_CONFIG_PRESENT, useValue: configPresent },
@@ -113,6 +120,22 @@ export class ProvidersModule implements OnApplicationShutdown {
       { provide: T.AccountConnectors, useFactory: (g: GoogleAuth) => [g.connector], inject: [GOOGLE_AUTH] },
       construct(T.ConnectAccount, ConnectAccount, [T.AccountConnectors, T.AccountRepository, T.ProviderRegistry]),
       construct(T.RemoveAccount, RemoveAccount, [T.AccountConnectors, T.AccountRepository, T.ProviderRegistry]),
+      { provide: AGENT_CREDENTIALS, useFactory: () => new FileAgentCredentialStore(dataDir()) },
+      { provide: AGENT_STATUS, useFactory: () => new FileAgentStatusStore(dataDir()) },
+      {
+        provide: T.AgentRunners,
+        useFactory: (credentials: FileAgentCredentialStore): AgentRunner[] => [
+          new ClaudeCliRunner({ tokens: credentials }),
+        ],
+        inject: [AGENT_CREDENTIALS],
+      },
+      { provide: T.AgentProviders, useValue: AGENT_PROVIDERS },
+      {
+        provide: T.ConnectAgent,
+        useFactory: (runners: AgentRunner[], credentials: AgentCredentialStore, status: AgentStatusStore, clock: Clock) =>
+          new ConnectAgent(runners, credentials, status, clock),
+        inject: [T.AgentRunners, AGENT_CREDENTIALS, AGENT_STATUS, T.Clock],
+      },
       construct(T.SetBusyCalendars, SetBusyCalendars, [T.AccountRepository]),
       {
         provide: T.EmailCleaner,
@@ -176,6 +199,8 @@ export class ProvidersModule implements OnApplicationShutdown {
 }
 
 const GOOGLE_AUTH = Symbol('GoogleAuth');
+const AGENT_CREDENTIALS = Symbol('AgentCredentials');
+const AGENT_STATUS = Symbol('AgentStatus');
 
 export interface GoogleAuth {
   readonly registry: ProviderRegistry;
