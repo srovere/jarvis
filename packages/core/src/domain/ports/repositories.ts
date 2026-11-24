@@ -14,6 +14,12 @@ export interface AccountRepository {
   get(id: string): Promise<Account>;
   upsert(a: Account): Promise<void>;
   setStatus(id: string, status: Account['status'], detail?: string): Promise<void>;
+  /** Case-insensitive lookup by address, whatever the account status. */
+  findByEmail(email: EmailAddress): Promise<Account | null>;
+  setBusyCalendars(id: string, ids: string[]): Promise<void>;
+  setMissingScopes(id: string, scopes: string[]): Promise<void>;
+  /** Removes the synced mail, events, tasks and sync state of the account; keeps the account row. */
+  deleteData(id: string): Promise<void>;
 }
 
 export interface SyncStateRepository {

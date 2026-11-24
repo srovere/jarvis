@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import { EmailAddress } from '@jarvis/core';
-import { FixedClock, InMemoryCalendarProvider, InMemoryMailProvider, InMemoryTasksProvider } from '@jarvis/core/testing';
+import { FixedClock, InMemoryCalendarProvider, InMemoryRepositories, InMemoryMailProvider, InMemoryTasksProvider } from '@jarvis/core/testing';
+import { describeAccountsContract } from './accounts.contract';
 import { describeCalendarContract } from './calendar.contract';
 import { describeDraftWriterContract } from './draft-writer.contract';
 import { FIXTURE_ACCOUNT_ID } from './fixtures';
@@ -30,4 +31,9 @@ describeTasksContract('InMemoryTasksProvider', async () => {
   const clock = new FixedClock(DateTime.fromISO('2026-11-23T10:00:00Z'));
   const p = new InMemoryTasksProvider({ accountId: FIXTURE_ACCOUNT_ID, clock });
   return { reader: p, writer: p };
+});
+
+describeAccountsContract('InMemoryRepositories', async () => {
+  const r = new InMemoryRepositories();
+  return { accounts: r.accounts, mail: r.mail, events: r.events, tasks: r.tasks, syncState: r.syncState };
 });

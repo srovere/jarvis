@@ -18,9 +18,16 @@ import type {
 } from '../domain/ports/repositories';
 import type { TaskChange } from '../domain/ports/tasks';
 
+/** Repositories that hold per-account synced data. */
+interface AccountDataStore {
+  deleteAccountData(accountId: string): void;
+}
+
 export class InMemoryAccountRepository implements AccountRepository {
   private readonly accounts = new Map<string, Account>();
   readonly statusDetails = new Map<string, string | undefined>();
+
+  constructor(private readonly dataStores: AccountDataStore[] = []) {}
 
   async list(): Promise<Account[]> {
     return [...this.accounts.values()];
@@ -41,6 +48,22 @@ export class InMemoryAccountRepository implements AccountRepository {
     this.accounts.set(id, { ...a, status });
     this.statusDetails.set(id, detail);
   }
+
+  async findByEmail(email: EmailAddress): Promise<Account | null> {
+    return [...this.accounts.values()].find((a) => a.email.equals(email)) ?? null;
+  }
+
+  async setBusyCalendars(id: string, ids: string[]): Promise<void> {
+    this.accounts.set(id, { ...(await this.get(id)), busyCalendars: ids });
+  }
+
+  async setMissingScopes(id: string, scopes: string[]): Promise<void> {
+    this.accounts.set(id, { ...(await this.get(id)), missingScopes: scopes });
+  }
+
+  async deleteData(id: string): Promise<void> {
+    for (const store of this.dataStores) store.deleteAccountData(id);
+  }
 }
 
 export class InMemorySyncStateRepository implements SyncStateRepository {
@@ -56,6 +79,10 @@ export class InMemorySyncStateRepository implements SyncStateRepository {
 
   async lastRunAt(accountId: string, resource: string): Promise<DateTime | null> {
     return this.state.get(`${accountId}|${resource}`)?.at ?? null;
+  }
+
+  deleteAccountData(accountId: string): void {
+    for (const key of [...this.state.keys()]) if (key.startsWith(`${accountId}|`)) this.state.delete(key);
   }
 }
 
@@ -85,6 +112,10 @@ export class InMemoryMailRepository implements MailRepository {
 
   async messageIdsSince(accountId: string, since: DateTime): Promise<string[]> {
     return [...(this.messages.get(accountId)?.values() ?? [])].filter((m) => m.date >= since).map((m) => m.id);
+  }
+
+  deleteAccountData(accountId: string): void {
+    this.messages.delete(accountId);
   }
 
   /** Thread summaries for an account, newest first. */
@@ -143,6 +174,10 @@ export class InMemoryEventRepository implements EventRepository {
       .filter(([key, e]) => key.startsWith(prefix) && e.range.start >= from)
       .map(([, e]) => e.id);
   }
+
+  deleteAccountData(accountId: string): void {
+    for (const [key, e] of [...this.events.entries()]) if (e.accountId === accountId) this.events.delete(key);
+  }
 }
 
 export class InMemoryTaskRepository implements TaskRepository {
@@ -189,6 +224,11 @@ export class InMemoryTaskRepository implements TaskRepository {
   async lists(accountIds: string[]): Promise<TaskList[]> {
     return [...this.taskLists.values()].filter((l) => accountIds.includes(l.accountId));
   }
+
+  deleteAccountData(accountId: string): void {
+    for (const [key, l] of [...this.taskLists.entries()]) if (l.accountId === accountId) this.taskLists.delete(key);
+    for (const [key, t] of [...this.tasks.entries()]) if (t.accountId === accountId) this.tasks.delete(key);
+  }
 }
 
 export class InMemoryPersonLinkLookup implements PersonLinkLookup {
@@ -204,10 +244,10 @@ export class InMemoryPersonLinkLookup implements PersonLinkLookup {
 }
 
 export class InMemoryRepositories {
-  readonly accounts = new InMemoryAccountRepository();
   readonly syncState = new InMemorySyncStateRepository();
   readonly mail = new InMemoryMailRepository();
   readonly events = new InMemoryEventRepository();
   readonly tasks = new InMemoryTaskRepository();
+  readonly accounts = new InMemoryAccountRepository([this.syncState, this.mail, this.events, this.tasks]);
   readonly personLinks = new InMemoryPersonLinkLookup();
 }

@@ -29,6 +29,9 @@ describe('ConfigAccountSeeder', () => {
       provider: 'google',
       email: EmailAddress.parse('me@example.com'),
       status: 'active',
+      busyCalendars: ['primary'],
+      missingScopes: [],
+      createdVia: 'config',
     });
     expect(await repo.get('work')).toEqual({
       id: 'work',
@@ -36,6 +39,9 @@ describe('ConfigAccountSeeder', () => {
       email: EmailAddress.parse('new@work.example'),
       displayName: 'Trabajo',
       status: 'needs_reauth',
+      busyCalendars: ['primary'],
+      missingScopes: [],
+      createdVia: 'config',
     });
   });
 

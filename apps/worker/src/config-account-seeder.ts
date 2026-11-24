@@ -26,6 +26,9 @@ export class ConfigAccountSeeder implements OnModuleInit {
         email: EmailAddress.parse(email),
         ...(current?.displayName ? { displayName: current.displayName } : {}),
         status: current === undefined || current.status === 'disabled' ? 'active' : current.status,
+        busyCalendars: current?.busyCalendars ?? ['primary'],
+        missingScopes: current?.missingScopes ?? [],
+        createdVia: current?.createdVia ?? 'config',
       });
     }
     const configured = new Set(this.config.accounts.map((a) => a.id));

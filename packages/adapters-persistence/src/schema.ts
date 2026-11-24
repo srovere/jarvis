@@ -1,9 +1,11 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   jsonb,
   pgTable,
+  smallint,
   text,
   timestamp,
   unique,
@@ -38,6 +40,9 @@ export const accounts = pgTable('accounts', {
   displayName: text('display_name'),
   status: text('status').$type<'active' | 'needs_reauth' | 'disabled'>().notNull(),
   statusDetail: text('status_detail'),
+  calendarsBusy: text('calendars_busy').array().notNull().default(sql`'{primary}'::text[]`),
+  missingScopes: text('missing_scopes').array().notNull().default(sql`'{}'::text[]`),
+  createdVia: text('created_via').$type<'wizard' | 'config' | 'cli'>().notNull().default('config'),
   ...audit(),
 });
 
@@ -185,4 +190,15 @@ export const tasks = pgTable(
     unique('tasks_account_list_external_uq').on(t.accountId, t.listId, t.externalId),
     index('tasks_account_status_due_idx').on(t.accountId, t.status, t.dueAt),
   ],
+);
+
+/** Singleton row (id = 1) holding the user-editable settings document. */
+export const settings = pgTable(
+  'settings',
+  {
+    id: smallint('id').primaryKey(),
+    data: jsonb('data').notNull(),
+    ...audit(),
+  },
+  (t) => [check('settings_singleton_ck', sql`${t.id} = 1`)],
 );

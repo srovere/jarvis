@@ -8,4 +8,9 @@ export interface Account {
   email: EmailAddress;
   displayName?: string;
   status: 'active' | 'needs_reauth' | 'disabled';
+  /** Calendar ids whose events block time for this account; free-slot search uses the union over active accounts. */
+  busyCalendars: string[];
+  /** Required OAuth scopes the user did not grant (empty when consent was complete). */
+  missingScopes: string[];
+  createdVia: 'wizard' | 'config' | 'cli';
 }
