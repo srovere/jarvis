@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { appSettings, message, MONDAY_20, thread, UseCaseFixture, type AccountProviders } from './use-case-fixture.test-support';
+import { staticSettings, message, MONDAY_20, thread, UseCaseFixture, type AccountProviders } from './use-case-fixture.test-support';
 import { SearchEmails } from './search-emails';
 
 describe('SearchEmails', () => {
   let f: UseCaseFixture;
   let a1: AccountProviders;
-  const useCase = () => new SearchEmails(f.repos.accounts, f.registry, f.cleaner, appSettings());
+  const useCase = () => new SearchEmails(f.repos.accounts, f.registry, f.cleaner, staticSettings());
 
   beforeEach(async () => {
     f = new UseCaseFixture();

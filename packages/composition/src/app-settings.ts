@@ -1,20 +1,19 @@
-import type { JarvisConfig } from '@jarvis/config';
-import { DEFAULT_BUSY_CALENDARS, type AppSettings } from '@jarvis/core';
+import { JarvisConfigSchema, type JarvisConfig } from '@jarvis/config';
+import type { Preferences } from '@jarvis/core';
 
-/** Builds the use cases' settings from the validated configuration. */
-export function toAppSettings(config: JarvisConfig): AppSettings {
-  const { timezone: zone, workSchedule, focus, sync, briefing, accounts } = config;
+/** The preferences a validated configuration carries (YAML values, or the schema defaults for what it omits). */
+export function preferencesFromConfig(config: JarvisConfig): Preferences {
+  const { timezone, workSchedule, focus, sync, briefing } = config;
   return {
-    zone,
-    workSchedule: {
-      zone,
-      startHour: workSchedule.startHour,
-      endHour: workSchedule.endHour,
-      workDays: [...workSchedule.workDays],
-    },
+    zone: timezone,
+    workSchedule: { startHour: workSchedule.startHour, endHour: workSchedule.endHour, workDays: [...workSchedule.workDays] },
     focus: { ...focus },
-    sync: { gmailInitialWindowDays: sync.gmailInitialWindowDays },
+    sync: { intervalMinutes: sync.intervalMinutes, gmailInitialWindowDays: sync.gmailInitialWindowDays },
     briefing: { ...briefing },
-    busyCalendars: Object.fromEntries(accounts.map((a) => [a.id, a.calendars ?? [...DEFAULT_BUSY_CALENDARS]])),
   };
+}
+
+/** Preferences when neither the database nor a configuration file provides any: the schema defaults. */
+export function defaultPreferences(): Preferences {
+  return preferencesFromConfig(JarvisConfigSchema.parse({}));
 }

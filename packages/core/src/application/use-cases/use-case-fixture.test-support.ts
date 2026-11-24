@@ -12,7 +12,7 @@ import { InMemoryCalendarProvider } from '../../testing/in-memory-calendar-provi
 import { InMemoryMailProvider } from '../../testing/in-memory-mail-provider';
 import { InMemoryRepositories } from '../../testing/in-memory-repositories';
 import { InMemoryTasksProvider } from '../../testing/in-memory-tasks-provider';
-import type { AppSettings } from '../config';
+import type { AppSettings, SettingsProvider } from '../config';
 import { ProviderRegistry } from '../provider-registry';
 
 export const ZONE = 'America/Argentina/Buenos_Aires';
@@ -25,11 +25,17 @@ export function appSettings(overrides: Partial<AppSettings> = {}): AppSettings {
     zone: ZONE,
     workSchedule: { zone: ZONE, startHour: 9, endHour: 19, workDays: [1, 2, 3, 4, 5] },
     focus: { titlePrefix: '[Focus] ', horizonWorkDays: 5, defaultDurationMinutes: 90 },
-    sync: { gmailInitialWindowDays: 90 },
+    sync: { intervalMinutes: 5, gmailInitialWindowDays: 90 },
     briefing: { maxPriorityEmails: 10 },
     busyCalendars: {},
     ...overrides,
   };
+}
+
+/** A `SettingsProvider` that always returns the given settings (mutate the returned object's source to change them). */
+export function staticSettings(overrides: Partial<AppSettings> = {}): SettingsProvider {
+  const settings = appSettings(overrides);
+  return { current: async () => settings };
 }
 
 export interface AccountProviders {

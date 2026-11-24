@@ -5,3 +5,4 @@ export * from './paths';
 export * from './providers.module';
 export * from './system-clock';
 export * from './tokens';
+export * from './layered-settings';

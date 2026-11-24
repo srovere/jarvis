@@ -4,6 +4,7 @@ import {
   DrizzleAccountRepository,
   DrizzleEventRepository,
   DrizzleMailRepository,
+  DrizzleSettingsRepository,
   DrizzleSyncStateRepository,
   DrizzleTaskRepository,
   NullPersonLinkLookup,
@@ -19,7 +20,6 @@ import {
   EmailCleaner,
   FindFreeSlot,
   FocusSlotSearch,
-  FreeSlotFinder,
   GetDailyBriefing,
   ListEvents,
   ListTasks,
@@ -29,7 +29,9 @@ import {
   SearchEmails,
   SyncAccount,
   TOKENS,
-  type AppSettings,
+  type AccountRepository,
+  type Clock,
+  type SettingsStore,
 } from '@jarvis/core';
 import {
   Inject,
@@ -39,7 +41,8 @@ import {
   type Provider,
   type Type,
 } from '@nestjs/common';
-import { toAppSettings } from './app-settings';
+import { preferencesFromConfig } from './app-settings';
+import { LayeredSettings } from './layered-settings';
 import { authPaths } from './paths';
 import { SystemClock } from './system-clock';
 import { DB, JARVIS_CONFIG, LOG_SINK, stderrLogSink } from './tokens';
@@ -75,9 +78,15 @@ export class ProvidersModule implements OnApplicationShutdown {
       { provide: JARVIS_CONFIG, useValue: config },
       { provide: LOG_SINK, useValue: stderrLogSink },
       { provide: DB, useFactory: () => createDb(databaseUrl) },
-      { provide: T.AppSettings, useValue: toAppSettings(config) },
       { provide: T.Clock, useClass: SystemClock },
       construct(T.AccountRepository, DrizzleAccountRepository, [DB]),
+      construct(T.SettingsStore, DrizzleSettingsRepository, [DB]),
+      {
+        provide: T.SettingsProvider,
+        useFactory: (store: SettingsStore, accounts: AccountRepository, clock: Clock) =>
+          new LayeredSettings(store, accounts, preferencesFromConfig(config), clock),
+        inject: [T.SettingsStore, T.AccountRepository, T.Clock],
+      },
       construct(T.SyncStateRepository, DrizzleSyncStateRepository, [DB]),
       construct(T.MailRepository, DrizzleMailRepository, [DB]),
       construct(T.EventRepository, DrizzleEventRepository, [DB]),
@@ -88,19 +97,8 @@ export class ProvidersModule implements OnApplicationShutdown {
         provide: T.EmailCleaner,
         useFactory: () => new EmailCleaner({ maxChars: config.email.maxBodyChars, htmlToText: htmlToPlainText }),
       },
-      {
-        provide: T.FreeSlotFinder,
-        useFactory: (s: AppSettings) => new FreeSlotFinder(s.workSchedule),
-        inject: [T.AppSettings],
-      },
       construct(T.PriorityRules, PriorityRules, [T.PersonLinkLookup]),
-      construct(T.FocusSlotSearch, FocusSlotSearch, [
-        T.AccountRepository,
-        T.EventRepository,
-        T.FreeSlotFinder,
-        T.Clock,
-        T.AppSettings,
-      ]),
+      construct(T.FocusSlotSearch, FocusSlotSearch, [T.AccountRepository, T.EventRepository, T.Clock]),
       construct(T.SyncAccount, SyncAccount, [
         T.AccountRepository,
         T.ProviderRegistry,
@@ -109,11 +107,11 @@ export class ProvidersModule implements OnApplicationShutdown {
         T.EventRepository,
         T.TaskRepository,
         T.Clock,
-        T.AppSettings,
+        T.SettingsProvider,
         LOG_SINK,
       ]),
-      construct(T.SearchEmails, SearchEmails, [T.AccountRepository, T.ProviderRegistry, T.EmailCleaner, T.AppSettings]),
-      construct(T.ReadThread, ReadThread, [T.AccountRepository, T.ProviderRegistry, T.EmailCleaner, T.AppSettings]),
+      construct(T.SearchEmails, SearchEmails, [T.AccountRepository, T.ProviderRegistry, T.EmailCleaner, T.SettingsProvider]),
+      construct(T.ReadThread, ReadThread, [T.AccountRepository, T.ProviderRegistry, T.EmailCleaner, T.SettingsProvider]),
       construct(T.GetDailyBriefing, GetDailyBriefing, [
         T.AccountRepository,
         T.ProviderRegistry,
@@ -123,31 +121,25 @@ export class ProvidersModule implements OnApplicationShutdown {
         T.PriorityRules,
         T.EmailCleaner,
         T.Clock,
-        T.AppSettings,
+        T.SettingsProvider,
       ]),
-      construct(T.ListEvents, ListEvents, [T.AccountRepository, T.EventRepository, T.AppSettings]),
-      construct(T.ListTasks, ListTasks, [T.AccountRepository, T.TaskRepository, T.AppSettings]),
-      construct(T.FindFreeSlot, FindFreeSlot, [
-        T.AccountRepository,
-        T.EventRepository,
-        T.FreeSlotFinder,
-        T.Clock,
-        T.AppSettings,
-      ]),
+      construct(T.ListEvents, ListEvents, [T.AccountRepository, T.EventRepository, T.SettingsProvider]),
+      construct(T.ListTasks, ListTasks, [T.AccountRepository, T.TaskRepository, T.SettingsProvider]),
+      construct(T.FindFreeSlot, FindFreeSlot, [T.AccountRepository, T.EventRepository, T.Clock, T.SettingsProvider]),
       construct(T.BlockFocusTime, BlockFocusTime, [
         T.AccountRepository,
         T.EventRepository,
         T.FocusSlotSearch,
         T.ProviderRegistry,
-        T.AppSettings,
+        T.SettingsProvider,
       ]),
       construct(T.CreateDraft, CreateDraft, [T.AccountRepository, T.ProviderRegistry]),
-      construct(T.CreateTask, CreateTask, [T.AccountRepository, T.TaskRepository, T.ProviderRegistry, T.AppSettings]),
+      construct(T.CreateTask, CreateTask, [T.AccountRepository, T.TaskRepository, T.ProviderRegistry, T.SettingsProvider]),
       construct(T.CompleteTask, CompleteTask, [
         T.AccountRepository,
         T.TaskRepository,
         T.ProviderRegistry,
-        T.AppSettings,
+        T.SettingsProvider,
       ]),
     ];
     return {

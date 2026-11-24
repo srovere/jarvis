@@ -1,11 +1,12 @@
 import { DateTime } from 'luxon';
 import { EmailAddress } from '@jarvis/core';
-import { FixedClock, InMemoryCalendarProvider, InMemoryRepositories, InMemoryMailProvider, InMemoryTasksProvider } from '@jarvis/core/testing';
+import { FixedClock, InMemoryCalendarProvider, InMemoryRepositories, InMemoryMailProvider, InMemorySettingsStore, InMemoryTasksProvider } from '@jarvis/core/testing';
 import { describeAccountsContract } from './accounts.contract';
 import { describeCalendarContract } from './calendar.contract';
 import { describeDraftWriterContract } from './draft-writer.contract';
 import { FIXTURE_ACCOUNT_ID } from './fixtures';
 import { describeMailReaderContract } from './mail-reader.contract';
+import { describeSettingsContract } from './settings.contract';
 import { describeTasksContract } from './tasks.contract';
 
 const own = [EmailAddress.parse('me@x.com')];
@@ -37,3 +38,5 @@ describeAccountsContract('InMemoryRepositories', async () => {
   const r = new InMemoryRepositories();
   return { accounts: r.accounts, mail: r.mail, events: r.events, tasks: r.tasks, syncState: r.syncState };
 });
+
+describeSettingsContract('InMemorySettingsStore', async () => new InMemorySettingsStore());

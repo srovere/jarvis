@@ -1,18 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DomainError } from '../../domain/errors';
-import { FreeSlotFinder } from '../../domain/services/free-slot-finder';
 import { FocusSlotSearch } from '../focus-slot-search';
-import { appSettings, at, event, UseCaseFixture } from './use-case-fixture.test-support';
+import { at, staticSettings, event, UseCaseFixture } from './use-case-fixture.test-support';
 import { BlockFocusTime } from './block-focus-time';
 
 describe('BlockFocusTime', () => {
   let f: UseCaseFixture;
-  const settings = appSettings();
+  const settings = staticSettings();
   const build = () =>
     new BlockFocusTime(
       f.repos.accounts,
       f.repos.events,
-      new FocusSlotSearch(f.repos.accounts, f.repos.events, new FreeSlotFinder(settings.workSchedule), f.clock, settings),
+      new FocusSlotSearch(f.repos.accounts, f.repos.events, f.clock),
       f.registry,
       settings,
     );
@@ -121,7 +120,7 @@ describe('BlockFocusTime', () => {
     const b = new BlockFocusTime(
       empty.repos.accounts,
       empty.repos.events,
-      new FocusSlotSearch(empty.repos.accounts, empty.repos.events, new FreeSlotFinder(settings.workSchedule), empty.clock, settings),
+      new FocusSlotSearch(empty.repos.accounts, empty.repos.events, empty.clock),
       empty.registry,
       settings,
     );

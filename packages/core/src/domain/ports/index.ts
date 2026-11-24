@@ -5,3 +5,4 @@ export * from './mail';
 export * from './provider';
 export * from './repositories';
 export * from './tasks';
+export * from './settings';

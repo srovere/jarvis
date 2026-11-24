@@ -5,7 +5,7 @@ import type { TaskList } from '../../domain/model/tasks';
 import type { ProviderBundle } from '../../domain/ports/provider';
 import type { AccountRepository, TaskRepository } from '../../domain/ports/repositories';
 import { selectAccount } from '../active-accounts';
-import type { AppSettings } from '../config';
+import type { AppSettings, SettingsProvider } from '../config';
 import type { ProviderRegistry } from '../provider-registry';
 import { toBriefingTasks, type BriefingTask } from '../views';
 
@@ -15,11 +15,12 @@ export class CreateTask {
     private readonly accounts: AccountRepository,
     private readonly tasks: TaskRepository,
     private readonly registry: ProviderRegistry,
-    private readonly settings: AppSettings,
+    private readonly settings: SettingsProvider,
   ) {}
 
   async execute(q: { title: string; notes?: string; due?: string; listId?: string; accountId?: string }): Promise<BriefingTask> {
-    const due = q.due === undefined ? undefined : this.parseDue(q.due);
+    const { zone } = await this.settings.current();
+    const due = q.due === undefined ? undefined : this.parseDue(q.due, zone);
     const account = await selectAccount(this.accounts, q.accountId);
     const bundle = await this.registry.forAccount(account);
     if (!bundle.tasks) throw new DomainError(`Account ${account.id} does not support tasks`);
@@ -33,11 +34,11 @@ export class CreateTask {
       ...(due ? { due } : {}),
     });
     await this.tasks.applyChanges(account.id, listId, [{ kind: 'upsert', task }]);
-    return toBriefingTasks([task], lists, this.settings.zone)[0]!;
+    return toBriefingTasks([task], lists, zone)[0]!;
   }
 
-  private parseDue(due: string): DateTime {
-    const dt = /^\d{4}-\d{2}-\d{2}$/.test(due) ? DateTime.fromISO(due, { zone: this.settings.zone }) : null;
+  private parseDue(due: string, zone: string): DateTime {
+    const dt = /^\d{4}-\d{2}-\d{2}$/.test(due) ? DateTime.fromISO(due, { zone }) : null;
     if (!dt?.isValid) throw new DomainError(`Invalid date: ${due}`);
     return dt.startOf('day');
   }

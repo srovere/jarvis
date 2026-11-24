@@ -45,6 +45,17 @@ describe('ConfigAccountSeeder', () => {
     });
   });
 
+  it('copies the YAML calendars into the account busy calendars', async () => {
+    const repo = new InMemoryAccountRepository();
+    const withCalendars = JarvisConfigSchema.parse({
+      accounts: [{ id: 'work', provider: 'google', email: 'w@work.example', calendars: ['primary', 'team'] }],
+    });
+
+    await new ConfigAccountSeeder(repo, withCalendars).onModuleInit();
+
+    expect((await repo.get('work')).busyCalendars).toEqual(['primary', 'team']);
+  });
+
   it('disables accounts that are no longer in the config, so they are not synced nor picked as first active', async () => {
     const repo = new InMemoryAccountRepository();
     await repo.upsert({ id: 'removed', provider: 'google', email: EmailAddress.parse('old@x.example'), status: 'active' });

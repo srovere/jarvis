@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { JarvisConfigSchema, type JarvisConfig } from '@jarvis/config';
-import { ProviderRegistry, TOKENS, type AppSettings } from '@jarvis/core';
-import { FixedClock, InMemoryRepositories } from '@jarvis/core/testing';
+import { EmailAddress, ProviderRegistry, TOKENS, type SettingsProvider } from '@jarvis/core';
+import { FixedClock, InMemoryRepositories, InMemorySettingsStore } from '@jarvis/core/testing';
 import { Test } from '@nestjs/testing';
 import { DateTime } from 'luxon';
 import { describe, expect, it, vi } from 'vitest';
@@ -22,6 +22,7 @@ const config: JarvisConfig = JarvisConfigSchema.parse({
 
 async function compile() {
   const repos = new InMemoryRepositories();
+  const store = new InMemorySettingsStore();
   const end = vi.fn().mockResolvedValue(undefined);
   const module = await Test.createTestingModule({
     imports: [ProvidersModule.forRoot({ config, configDir: '/etc/jarvis', databaseUrl: 'postgres://unused/db' })],
@@ -30,6 +31,8 @@ async function compile() {
     .useValue({ $client: { end } })
     .overrideProvider(TOKENS.AccountRepository)
     .useValue(repos.accounts)
+    .overrideProvider(TOKENS.SettingsStore)
+    .useValue(store)
     .overrideProvider(TOKENS.SyncStateRepository)
     .useValue(repos.syncState)
     .overrideProvider(TOKENS.MailRepository)
@@ -45,7 +48,7 @@ async function compile() {
     .overrideProvider(TOKENS.Clock)
     .useValue(new FixedClock(DateTime.fromISO('2026-11-23T10:00:00Z')))
     .compile();
-  return { module, repos, end };
+  return { module, repos, store, end };
 }
 
 describe('ProvidersModule', () => {
@@ -67,16 +70,27 @@ describe('ProvidersModule', () => {
     await module.close();
   });
 
-  it('maps the configuration to AppSettings', async () => {
-    const { module } = await compile();
-    expect(module.get<AppSettings>(TOKENS.AppSettings)).toEqual({
+  it('derives settings from the configuration and the active accounts, until preferences are saved', async () => {
+    const { module, repos, store } = await compile();
+    await repos.accounts.upsert({
+      id: 'work',
+      provider: 'google',
+      email: EmailAddress.parse('me@work.example'),
+      status: 'active',
+      busyCalendars: ['primary', 'team'],
+      missingScopes: [],
+      createdVia: 'config',
+    });
+    const provider = module.get<SettingsProvider>(TOKENS.SettingsProvider);
+    expect(await provider.current()).toEqual({
       zone: 'Europe/Madrid',
       workSchedule: { zone: 'Europe/Madrid', startHour: 8, endHour: 17, workDays: [1, 2, 3] },
       focus: { titlePrefix: '[F] ', horizonWorkDays: 3, defaultDurationMinutes: 60 },
-      sync: { gmailInitialWindowDays: 30 },
+      sync: { intervalMinutes: 7, gmailInitialWindowDays: 30 },
       briefing: { maxPriorityEmails: 4 },
-      busyCalendars: { personal: ['primary'], work: ['primary', 'team'] },
+      busyCalendars: { work: ['primary', 'team'] },
     });
+    expect(await store.load()).toBeNull();
     await module.close();
   });
 

@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CursorExpired, ReauthRequired } from '../../domain/errors';
 import { TimeRange } from '../../domain/model/time-range';
-import type { AppSettings } from '../config';
+import type { SettingsProvider } from '../config';
 import { SyncAccount } from './sync-account';
-import { appSettings, at, event, message, MONDAY_20, task, thread, UseCaseFixture } from './use-case-fixture.test-support';
+import { at, event, message, MONDAY_20, staticSettings, task, thread, UseCaseFixture } from './use-case-fixture.test-support';
 
 const LIST = { id: 'l1', accountId: 'a1', title: 'Inbox', isDefault: true };
 
 describe('SyncAccount', () => {
   let f: UseCaseFixture;
   let log: ReturnType<typeof vi.fn<(line: string) => void>>;
-  const useCase = (settings: AppSettings = appSettings()) =>
+  const useCase = (settings: SettingsProvider = staticSettings()) =>
     new SyncAccount(f.repos.accounts, f.registry, f.repos.syncState, f.repos.mail, f.repos.events, f.repos.tasks, f.clock, settings, log);
   const week = new TimeRange(at('2026-11-01T00:00:00'), at('2026-12-31T00:00:00'));
 
@@ -194,7 +194,7 @@ describe('SyncAccount', () => {
     ]);
     const sync = vi.spyOn(p.calendar, 'sync');
 
-    const result = await useCase(appSettings({ busyCalendars: { a1: ['primary', 'team'] } })).execute('a1');
+    const result = await useCase(staticSettings({ busyCalendars: { a1: ['primary', 'team'] } })).execute('a1');
 
     expect(sync.mock.calls.map((c) => c[0])).toEqual(['primary', 'team']);
     expect(result.fullResync).toEqual(['mail', 'calendar:primary', 'calendar:team', 'tasks:l1']);

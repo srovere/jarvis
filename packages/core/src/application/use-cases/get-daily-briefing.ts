@@ -6,7 +6,7 @@ import type { Clock } from '../../domain/ports/clock';
 import type { AccountRepository, EventRepository, MailRepository, TaskRepository } from '../../domain/ports/repositories';
 import type { EmailCleaner } from '../../domain/services/email-cleaner';
 import type { PriorityRules } from '../../domain/services/priority-rules';
-import type { AppSettings } from '../config';
+import type { AppSettings, SettingsProvider } from '../config';
 import type { ProviderRegistry } from '../provider-registry';
 import { isAttended, isoIn, toBriefingEvent, toBriefingTasks, type BriefingEmail, type DailyBriefing } from '../views';
 
@@ -25,11 +25,12 @@ export class GetDailyBriefing {
     private readonly priority: PriorityRules,
     private readonly cleaner: EmailCleaner,
     private readonly clock: Clock,
-    private readonly settings: AppSettings,
+    private readonly settings: SettingsProvider,
   ) {}
 
   async execute(q: { dateOffsetDays: number }): Promise<DailyBriefing> {
-    const zone = this.settings.zone;
+    const settings = await this.settings.current();
+    const zone = settings.zone;
     const day = this.clock.now().setZone(zone).plus({ days: q.dateOffsetDays }).startOf('day');
     const range = new TimeRange(day, day.plus({ days: 1 }));
     const all = await this.accounts.list();
@@ -46,7 +47,7 @@ export class GetDailyBriefing {
     return {
       date: day.toISODate()!,
       events,
-      priorityEmails: await this.priorityEmails(active, range),
+      priorityEmails: await this.priorityEmails(active, range, settings),
       tasksDue: toBriefingTasks(due, lists, zone),
       accountsNeedingReauth: all.filter((a) => a.status === 'needs_reauth').map((a) => a.id),
     };
@@ -61,7 +62,7 @@ export class GetDailyBriefing {
     }
   }
 
-  private async priorityEmails(active: Account[], day: TimeRange): Promise<BriefingEmail[]> {
+  private async priorityEmails(active: Account[], day: TimeRange, settings: AppSettings): Promise<BriefingEmail[]> {
     const since = day.start.minus({ days: EMAIL_LOOKBACK_DAYS });
     const candidates: MailThreadSummary[] = [];
     const own: EmailAddress[] = [];
@@ -69,12 +70,12 @@ export class GetDailyBriefing {
       own.push(...(await this.ownAddresses(account)));
       candidates.push(...(await this.mail.recentThreads(account.id, { since, limit: EMAIL_CANDIDATES_PER_ACCOUNT })));
     }
-    const ranked = await this.priority.rank(candidates, own, this.settings.briefing.maxPriorityEmails);
+    const ranked = await this.priority.rank(candidates, own, settings.briefing.maxPriorityEmails);
     return ranked.map((t) => ({
       threadId: t.id,
       from: t.lastFrom.toString(),
       subject: t.subject,
-      date: isoIn(t.lastMessageAt, this.settings.zone),
+      date: isoIn(t.lastMessageAt, settings.zone),
       snippet: this.cleaner.cleanSnippet(t.snippet),
     }));
   }

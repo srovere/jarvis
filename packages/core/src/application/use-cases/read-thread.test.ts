@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DomainError, ThreadNotFound } from '../../domain/errors';
-import { appSettings, message, MONDAY_20, thread, UseCaseFixture } from './use-case-fixture.test-support';
+import { staticSettings, message, MONDAY_20, thread, UseCaseFixture } from './use-case-fixture.test-support';
 import { ReadThread } from './read-thread';
 
 describe('ReadThread', () => {
   let f: UseCaseFixture;
-  const useCase = () => new ReadThread(f.repos.accounts, f.registry, f.cleaner, appSettings());
+  const useCase = () => new ReadThread(f.repos.accounts, f.registry, f.cleaner, staticSettings());
 
   beforeEach(async () => {
     f = new UseCaseFixture();

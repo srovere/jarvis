@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { appSettings, task, UseCaseFixture } from './use-case-fixture.test-support';
+import { staticSettings, task, UseCaseFixture } from './use-case-fixture.test-support';
 import { CompleteTask } from './complete-task';
 
 describe('CompleteTask', () => {
@@ -14,7 +14,7 @@ describe('CompleteTask', () => {
     p.tasks.seed(lists, [t]);
     await f.repos.tasks.upsertLists('a1', lists);
     await f.repos.tasks.applyChanges('a1', 'l1', [{ kind: 'upsert', task: t }]);
-    uc = new CompleteTask(f.repos.accounts, f.repos.tasks, f.registry, appSettings());
+    uc = new CompleteTask(f.repos.accounts, f.repos.tasks, f.registry, staticSettings());
   });
 
   it('completes the task at the provider and leaves it completed in the DB', async () => {

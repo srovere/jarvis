@@ -4,7 +4,7 @@ import type { MailThread } from '../../domain/model/mail';
 import type { AccountRepository } from '../../domain/ports/repositories';
 import type { EmailCleaner } from '../../domain/services/email-cleaner';
 import { activeAccounts } from '../active-accounts';
-import type { AppSettings } from '../config';
+import type { AppSettings, SettingsProvider } from '../config';
 import type { ProviderRegistry } from '../provider-registry';
 import { toEmailResult, type EmailResult } from '../views';
 
@@ -20,10 +20,11 @@ export class ReadThread {
     private readonly accounts: AccountRepository,
     private readonly registry: ProviderRegistry,
     private readonly cleaner: EmailCleaner,
-    private readonly settings: AppSettings,
+    private readonly settings: SettingsProvider,
   ) {}
 
   async execute(q: { accountId?: string; threadId: string }): Promise<ThreadView> {
+    const { zone } = await this.settings.current();
     const thread = q.accountId
       ? await this.fetch(await this.accounts.get(q.accountId), q.threadId)
       : await this.findInActiveAccounts(q.threadId);
@@ -32,7 +33,7 @@ export class ReadThread {
       subject: thread.subject,
       messages: [...thread.messages]
         .sort((a, b) => a.date.toMillis() - b.date.toMillis())
-        .map((m) => toEmailResult(m, this.cleaner, this.settings.zone)),
+        .map((m) => toEmailResult(m, this.cleaner, zone)),
     };
   }
 

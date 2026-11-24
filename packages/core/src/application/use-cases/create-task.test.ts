@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { appSettings, MONDAY_20, UseCaseFixture } from './use-case-fixture.test-support';
+import { staticSettings, MONDAY_20, UseCaseFixture } from './use-case-fixture.test-support';
 import { CreateTask } from './create-task';
 
 describe('CreateTask', () => {
@@ -13,7 +13,7 @@ describe('CreateTask', () => {
       { id: 'l1', accountId: 'a1', title: 'Other', isDefault: false },
       { id: 'l2', accountId: 'a1', title: 'Mine', isDefault: true },
     ]);
-    uc = new CreateTask(f.repos.accounts, f.repos.tasks, f.registry, appSettings());
+    uc = new CreateTask(f.repos.accounts, f.repos.tasks, f.registry, staticSettings());
   });
 
   it('creates in the default list with the due date at start of day in the zone, and stores it', async () => {

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { appSettings, at, task, UseCaseFixture } from './use-case-fixture.test-support';
+import { staticSettings, at, task, UseCaseFixture } from './use-case-fixture.test-support';
 import { ListTasks } from './list-tasks';
 
 describe('ListTasks', () => {
   let f: UseCaseFixture;
-  const useCase = () => new ListTasks(f.repos.accounts, f.repos.tasks, appSettings());
+  const useCase = () => new ListTasks(f.repos.accounts, f.repos.tasks, staticSettings());
 
   beforeEach(async () => {
     f = new UseCaseFixture();

@@ -18,7 +18,7 @@ export class ConfigAccountSeeder implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     const existing = new Map((await this.accounts.list()).map((a) => [a.id, a]));
-    for (const { id, provider, email } of this.config.accounts) {
+    for (const { id, provider, email, calendars } of this.config.accounts) {
       const current = existing.get(id);
       await this.accounts.upsert({
         id,
@@ -26,7 +26,7 @@ export class ConfigAccountSeeder implements OnModuleInit {
         email: EmailAddress.parse(email),
         ...(current?.displayName ? { displayName: current.displayName } : {}),
         status: current === undefined || current.status === 'disabled' ? 'active' : current.status,
-        busyCalendars: current?.busyCalendars ?? ['primary'],
+        busyCalendars: calendars ?? current?.busyCalendars ?? ['primary'],
         missingScopes: current?.missingScopes ?? [],
         createdVia: current?.createdVia ?? 'config',
       });

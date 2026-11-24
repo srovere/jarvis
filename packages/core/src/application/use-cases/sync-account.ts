@@ -12,7 +12,7 @@ import type {
   TaskRepository,
 } from '../../domain/ports/repositories';
 import type { TaskReader } from '../../domain/ports/tasks';
-import { busyCalendarsOf, type AppSettings } from '../config';
+import { busyCalendarsOf, type AppSettings, type SettingsProvider } from '../config';
 import type { ProviderRegistry } from '../provider-registry';
 
 export type SyncResourceKind = 'mail' | 'calendar' | 'tasks';
@@ -53,11 +53,12 @@ export class SyncAccount {
     private readonly events: EventRepository,
     private readonly tasks: TaskRepository,
     private readonly clock: Clock,
-    private readonly settings: AppSettings,
+    private readonly settings: SettingsProvider,
     private readonly log: (line: string) => void = (line) => console.error(line),
   ) {}
 
   async execute(accountId: string): Promise<SyncAccountResult> {
+    const settings = await this.settings.current();
     const account = await this.accounts.get(accountId);
     const result: SyncAccountResult = {
       status: account.status,
@@ -66,7 +67,7 @@ export class SyncAccount {
     };
     try {
       const bundle = await this.registry.forAccount(account);
-      for (const [kind, units] of this.plan(accountId, bundle)) {
+      for (const [kind, units] of this.plan(accountId, bundle, settings)) {
         if (!units) continue;
         result.resources[kind] = 'error'; // stays so if ReauthRequired interrupts this kind
         result.resources[kind] = await this.syncKind(accountId, kind, units, result);
@@ -86,14 +87,15 @@ export class SyncAccount {
   private plan(
     accountId: string,
     b: ProviderBundle,
+    settings: AppSettings,
   ): [SyncResourceKind, (() => Promise<SyncUnit[]>) | undefined][] {
     const { mail, calendar, tasks } = b;
     return [
-      ['mail', mail && (async () => [this.mailUnit(accountId, mail)])],
+      ['mail', mail && (async () => [this.mailUnit(accountId, mail, settings)])],
       [
         'calendar',
         calendar &&
-          (async () => busyCalendarsOf(this.settings, accountId).map((id) => this.calendarUnit(accountId, calendar, id))),
+          (async () => busyCalendarsOf(settings, accountId).map((id) => this.calendarUnit(accountId, calendar, id))),
       ],
       ['tasks', tasks && (() => this.taskUnits(accountId, tasks))],
     ];
@@ -145,8 +147,8 @@ export class SyncAccount {
     this.log(JSON.stringify({ level: 'error', msg: 'sync resource failed', accountId, resource, error }));
   }
 
-  private mailUnit(accountId: string, reader: MailReader): SyncUnit {
-    const windowDays = this.settings.sync.gmailInitialWindowDays;
+  private mailUnit(accountId: string, reader: MailReader, settings: AppSettings): SyncUnit {
+    const windowDays = settings.sync.gmailInitialWindowDays;
     return {
       key: 'mail',
       run: async (cursor) => {

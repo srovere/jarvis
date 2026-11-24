@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailAddress } from '../../domain/model/email-address';
 import { PriorityRules } from '../../domain/services/priority-rules';
 import { GetDailyBriefing } from './get-daily-briefing';
-import { appSettings, at, event, message, MONDAY_20, task, UseCaseFixture } from './use-case-fixture.test-support';
+import { staticSettings, at, event, message, MONDAY_20, task, UseCaseFixture } from './use-case-fixture.test-support';
 
 describe('GetDailyBriefing', () => {
   let f: UseCaseFixture;
@@ -16,7 +16,7 @@ describe('GetDailyBriefing', () => {
       new PriorityRules(f.repos.personLinks),
       f.cleaner,
       f.clock,
-      appSettings(),
+      staticSettings(),
     );
 
   beforeEach(async () => {

@@ -2,7 +2,7 @@ import type { MailMessage } from '../../domain/model/mail';
 import type { AccountRepository } from '../../domain/ports/repositories';
 import type { EmailCleaner } from '../../domain/services/email-cleaner';
 import { activeAccounts } from '../active-accounts';
-import type { AppSettings } from '../config';
+import type { AppSettings, SettingsProvider } from '../config';
 import type { ProviderRegistry } from '../provider-registry';
 import { toEmailResult, type EmailResult } from '../views';
 
@@ -15,10 +15,11 @@ export class SearchEmails {
     private readonly accounts: AccountRepository,
     private readonly registry: ProviderRegistry,
     private readonly cleaner: EmailCleaner,
-    private readonly settings: AppSettings,
+    private readonly settings: SettingsProvider,
   ) {}
 
   async execute(q: { query: string; maxResults?: number }): Promise<EmailResult[]> {
+    const { zone } = await this.settings.current();
     const maxResults = Math.min(MAX_RESULTS, Math.max(1, Math.trunc(q.maxResults ?? DEFAULT_MAX_RESULTS)));
     const latest: MailMessage[] = [];
     for (const account of await activeAccounts(this.accounts)) {
@@ -33,6 +34,6 @@ export class SearchEmails {
     return latest
       .sort((a, b) => b.date.toMillis() - a.date.toMillis())
       .slice(0, maxResults)
-      .map((m) => toEmailResult(m, this.cleaner, this.settings.zone));
+      .map((m) => toEmailResult(m, this.cleaner, zone));
   }
 }
