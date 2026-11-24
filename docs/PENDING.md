@@ -1,6 +1,6 @@
 # Jarvis — Pending work
 
-Status as of 2026-11-24. Phase 1 is merged into `main`; the final-review fixes are on `fix/phase1-final-review`.
+Status as of 2026-11-24. Phase 1 and its final-review fixes are merged into `main`.
 
 ## Where we are
 
@@ -19,16 +19,15 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
 
 ## Next steps (in order)
 
-1. ~~Final whole-branch review + fix round~~ — done on branch `fix/phase1-final-review` (C1, C2, I1-I5 fixed).
+1. ~~Final whole-branch review + fix round~~ — done and merged on 2026-11-24 (C1, C2, I1-I5 fixed).
    Re-check C1 (live Google tools from the `mcp-server` container) and C2 (re-authorization recovery) during the
    real-account verification.
 2. **Real verification with the Google account** following the README: Google Cloud project, secrets,
    `jarvis.config.yaml`, `docker compose run … auth`, `docker compose up -d`, `claude mcp add …`. Create a test
    draft and event only with explicit confirmation.
-3. ~~Merge `feat/jarvis-fase1` into `main`~~ — done on 2026-11-23 (without the final review; run it against `main`).
-4. **Documentation** (see next section).
-5. **Onboarding wizard** (see section below).
-6. Next phases of the design: 2 Projects (local/SSH, discovery, people, task mirror) ·
+3. **Documentation** (see next section).
+4. **Onboarding wizard** (see section below).
+5. Next phases of the design: 2 Projects (local/SSH, discovery, people, task mirror) ·
    3 Agent (Claude Code, highlights, meeting summaries, action approval) ·
    4 API + React dashboard + chat · 5 Analytics.
 
@@ -74,6 +73,7 @@ A guided setup that replaces the manual README steps:
 - `ProvidersModule`: the positional `inject` loses type checking of the argument order.
 
 ### Minor
+- Scheduler "sync finished" log counts skipped `needs_reauth` accounts.
 
 - EmailCleaner: `&#0;` decodes to NUL; truncation can split surrogate pairs.
 - FreeSlotFinder: missing edge-case tests (unsorted events, `now` after end of day, weekend, exhausted horizon);
