@@ -15,3 +15,4 @@ export * from './use-cases/list-tasks';
 export * from './use-cases/read-thread';
 export * from './use-cases/search-emails';
 export * from './use-cases/sync-account';
+export * from './use-cases/import-config';

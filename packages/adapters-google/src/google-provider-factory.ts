@@ -7,6 +7,8 @@ import { GoogleTasksAdapter } from './tasks/google-tasks-adapter';
 
 export interface OAuthClientSource {
   client(accountId: string): Promise<OAuth2Client>;
+  /** Identifies the stored credentials, so a re-authorized token is noticed. */
+  tokenFingerprint?(accountId: string): Promise<string>;
 }
 
 export const GOOGLE_CAPABILITIES: ProviderCapabilities = {
@@ -24,6 +26,10 @@ export class GoogleProviderFactory implements ProviderFactory {
     private readonly oauth: OAuthClientSource,
     private readonly zone: string,
   ) {}
+
+  async fingerprint(account: Account): Promise<string> {
+    return (await this.oauth.tokenFingerprint?.(account.id)) ?? 'static';
+  }
 
   async create(account: Account): Promise<ProviderBundle> {
     const auth = await this.oauth.client(account.id);

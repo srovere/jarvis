@@ -62,4 +62,19 @@ describe('ProviderRegistry', () => {
     await expect(reg.forAccount(account('1'))).rejects.toThrow('boom');
     await expect(reg.forAccount(account('1'))).resolves.toBeDefined();
   });
+
+  it('rebuilds the cached bundle when the factory fingerprint changed, and reuses it otherwise', async () => {
+    const create = vi.fn(async () => bundle());
+    let fp = 'v1';
+    const reg = new ProviderRegistry();
+    reg.register({ kind: 'google', create, fingerprint: async () => fp });
+    const first = await reg.forAccount(account('1'));
+    expect(await reg.forAccount(account('1'))).toBe(first);
+    expect(create).toHaveBeenCalledTimes(1);
+    fp = 'v2';
+    const second = await reg.forAccount(account('1'));
+    expect(second).not.toBe(first);
+    expect(await reg.forAccount(account('1'))).toBe(second);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
 });

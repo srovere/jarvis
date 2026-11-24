@@ -11,6 +11,16 @@ describe('FileTokenStore', () => {
   });
   afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+  it('stats the token file, null when absent, and the stat changes on rewrite', async () => {
+    const store = new FileTokenStore(join(root, 'tokens'));
+    expect(await store.stat('personal')).toBeNull();
+    await store.write('personal', { refresh_token: 'r1' });
+    const first = await store.stat('personal');
+    expect(first?.size).toBeGreaterThan(0);
+    await store.write('personal', { refresh_token: 'r1', access_token: 'a-longer-value' });
+    expect(await store.stat('personal')).not.toEqual(first);
+  });
+
   it('returns null when there is no token', async () => {
     expect(await new FileTokenStore(join(root, 'tokens')).read('personal')).toBeNull();
   });

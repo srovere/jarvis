@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Credentials } from 'google-auth-library';
 
@@ -28,6 +28,17 @@ export class FileTokenStore {
       await rename(tmp, file);
     } catch (error) {
       await rm(tmp, { force: true });
+      throw error;
+    }
+  }
+
+  /** Modification time (ms) and size of the token file, or `null` when there is none. */
+  async stat(accountId: string): Promise<{ mtimeMs: number; size: number } | null> {
+    try {
+      const { mtimeMs, size } = await stat(this.fileFor(accountId));
+      return { mtimeMs, size };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw error;
     }
   }

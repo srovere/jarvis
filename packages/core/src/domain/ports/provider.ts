@@ -23,4 +23,6 @@ export interface ProviderBundle {
 export interface ProviderFactory {
   readonly kind: ProviderKind;
   create(account: Account): Promise<ProviderBundle>;
+  /** Changes whenever what `create` reads (e.g. the stored token) changed; the registry then rebuilds the bundle. */
+  fingerprint?(account: Account): Promise<string>;
 }

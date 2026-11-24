@@ -1,17 +1,35 @@
 import 'reflect-metadata';
-import { EmailAddress, type Account, type SyncAccountResult } from '@jarvis/core';
+import { EmailAddress, type Account, type AppSettings, type SyncAccountResult, type SyncRequests } from '@jarvis/core';
 import { FixedClock, InMemoryAccountRepository, InMemorySyncStateRepository } from '@jarvis/core/testing';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { DateTime } from 'luxon';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountSyncRunner, type AccountSyncer } from './account-sync-runner';
-import { SyncScheduler } from './sync.scheduler';
+import { POLL_MS, SyncScheduler } from './sync.scheduler';
 
 const NOW = DateTime.fromISO('2026-11-23T10:00:00Z');
 const OK: SyncAccountResult = { status: 'active', resources: { mail: 'ok', calendar: 'ok', tasks: 'ok' }, fullResync: [] };
 
 function account(id: string, status: Account['status'] = 'active'): Account {
-  return { id, provider: 'google', email: EmailAddress.parse(`${id}@example.com`), status };
+  return {
+    id,
+    provider: 'google',
+    email: EmailAddress.parse(`${id}@example.com`),
+    status,
+    busyCalendars: ['primary'],
+    missingScopes: [],
+    createdVia: 'config',
+  };
+}
+
+class FakeRequests implements SyncRequests {
+  ids: string[] = [];
+  async pending() {
+    return [...this.ids];
+  }
+  async clear(id: string) {
+    this.ids = this.ids.filter((i) => i !== id);
+  }
 }
 
 async function setup(accounts: Account[], execute: AccountSyncer['execute'] = vi.fn().mockResolvedValue(OK)) {
@@ -24,8 +42,11 @@ async function setup(accounts: Account[], execute: AccountSyncer['execute'] = vi
   const syncer = { execute: vi.fn(execute) };
   const registry = new SchedulerRegistry();
   const runner = new AccountSyncRunner(repo, syncer, log);
-  const scheduler = new SyncScheduler(runner, syncState, repo, clock, registry, { intervalMinutes: 5 }, log);
-  return { scheduler, syncer, syncState, registry, lines };
+  const sync = { intervalMinutes: 5, gmailInitialWindowDays: 30 };
+  const settings = { current: async () => ({ sync }) as AppSettings };
+  const requests = new FakeRequests();
+  const scheduler = new SyncScheduler(runner, syncState, repo, clock, registry, settings, requests, log);
+  return { scheduler, syncer, syncState, registry, lines, sync, requests };
 }
 
 describe('SyncScheduler', () => {
@@ -102,6 +123,40 @@ describe('SyncScheduler', () => {
       await scheduler.onModuleDestroy();
       await vi.advanceTimersByTimeAsync(5 * 60_000);
       expect(syncer.execute).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('picks up a changed interval on the next poll and re-schedules', async () => {
+    vi.useFakeTimers();
+    try {
+      const { scheduler, syncer, syncState, sync } = await setup([account('personal')]);
+      toStop = scheduler;
+      await syncState.set('personal', 'mail', 'c1', NOW);
+      await scheduler.onApplicationBootstrap();
+      sync.intervalMinutes = 2;
+      await vi.advanceTimersByTimeAsync(POLL_MS);
+      expect(syncer.execute).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2 * 60_000);
+      expect(syncer.execute).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('syncs an account with a pending request on the poll and clears the request', async () => {
+    vi.useFakeTimers();
+    try {
+      const { scheduler, syncer, syncState, requests } = await setup([account('personal'), account('work')]);
+      toStop = scheduler;
+      await syncState.set('personal', 'mail', 'c1', NOW);
+      await syncState.set('work', 'mail', 'c1', NOW);
+      await scheduler.onApplicationBootstrap();
+      requests.ids = ['work'];
+      await vi.advanceTimersByTimeAsync(POLL_MS);
+      expect(syncer.execute.mock.calls).toEqual([['work']]);
+      expect(requests.ids).toEqual([]);
     } finally {
       vi.useRealTimers();
     }

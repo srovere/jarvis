@@ -94,6 +94,12 @@ export class GoogleOAuthFlow {
     return client;
   }
 
+  /** Changes when the stored token file is rewritten (re-authorization or refresh); `none` without a token. */
+  async tokenFingerprint(accountId: string): Promise<string> {
+    const stat = await this.store.stat(accountId);
+    return stat ? `${stat.mtimeMs}:${stat.size}` : 'none';
+  }
+
   private async readClientSecret(): Promise<ClientSecret> {
     const json = JSON.parse(await readFile(this.clientSecretPath, 'utf8')) as {
       installed?: ClientSecret;

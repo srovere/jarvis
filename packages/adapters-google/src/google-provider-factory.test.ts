@@ -31,4 +31,12 @@ describe('GoogleProviderFactory', () => {
       incrementalSync: true,
     });
   });
+
+  it('fingerprints with the token fingerprint of the OAuth source', async () => {
+    const factory = new GoogleProviderFactory(
+      { client: async () => new OAuth2Client('id', 'secret'), tokenFingerprint: async (id) => `fp-${id}` },
+      'UTC',
+    );
+    expect(await factory.fingerprint(account)).toBe('fp-acc-1');
+  });
 });
