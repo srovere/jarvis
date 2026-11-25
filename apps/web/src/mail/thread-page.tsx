@@ -33,7 +33,7 @@ export function ThreadPage() {
                 </li>
               ))}
             </ol>
-            {replying && <DraftDialog threadId={thread.threadId} onClose={() => setReplying(false)} />}
+            {replying && <DraftDialog accountId={accountId} threadId={thread.threadId} onClose={() => setReplying(false)} />}
           </>
         )}
       </QueryState>

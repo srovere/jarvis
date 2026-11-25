@@ -294,6 +294,17 @@ describe('mcp-server (Streamable HTTP)', () => {
     expect(text(r)).toContain('Draft created (not sent)');
   });
 
+  it('create_gmail_draft honours account_id and rejects an unknown account', async () => {
+    const client = await connect();
+    const ok = await call(client, 'create_gmail_draft', { to: ['ana@client.com'], body: 'Sure', account_id: 'personal' });
+    expect(ok.isError).toBeFalsy();
+    const bad = await call(client, 'create_gmail_draft', { to: ['ana@client.com'], body: 'Sure', account_id: 'nope' });
+    expect(bad.isError).toBe(true);
+    const tools = (await client.listTools()).tools;
+    expect(tools.find((t) => t.name === 'create_gmail_draft')?.description).toContain('account_id');
+    expect(tools.find((t) => t.name === 'create_task')?.description).toContain('list_id');
+  });
+
   it('a non-domain error is reported as "Internal error" without details, and logged', async () => {
     vi.spyOn(world.repos.tasks, 'open').mockRejectedValueOnce(new Error('connection refused 10.0.0.7:5432'));
     const r = await call(await connect(), 'list_tasks');

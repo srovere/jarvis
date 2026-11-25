@@ -14,7 +14,7 @@ export function FocusDialog({ onClose }: { onClose: () => void }) {
   const [slot, setSlot] = useState<Slot | null | undefined>(undefined);
   const find = useMutation({ mutationFn: () => findFreeSlot(Number(duration)), onSuccess: (r) => setSlot(r.slot) });
   const block = useMutation({
-    mutationFn: () => blockFocus(name.trim(), Number(duration)),
+    mutationFn: () => blockFocus(name.trim(), Number(duration), slot ? Number(slot.start.slice(11, 13)) : undefined),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
   });
   const reset = () => {
@@ -54,6 +54,11 @@ export function FocusDialog({ onClose }: { onClose: () => void }) {
             {block.data.status === 'no_slot'
               ? 'No free slot fits any more; nothing was blocked.'
               : `${block.data.status === 'already_exists' ? 'A focus block already exists' : 'Focus time blocked'}: ${block.data.start && block.data.end ? fmtSlot({ start: block.data.start, end: block.data.end }) : ''}`}
+            {slot && block.data.start && block.data.end && block.data.start !== slot.start && block.data.status !== 'no_slot' && (
+              <span className="mt-1 block font-medium text-amber-700">
+                Note: this differs from the slot shown ({fmtSlot(slot)}); check your calendar.
+              </span>
+            )}
           </p>
         )}
         {(find.isError || block.isError) && (

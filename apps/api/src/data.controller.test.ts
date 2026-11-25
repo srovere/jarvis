@@ -285,6 +285,12 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
       expect(typeof r.json.draftId).toBe('string');
     });
 
+    it('passes the account of the thread through to create_gmail_draft', async () => {
+      const r = await send(port, 'POST', '/api/mail/drafts', { to: ['ana@client.com'], body: 'Hello', accountId: 'work' });
+      expect(r.status).toBe(201);
+      expect(calls[0]).toEqual(['create_gmail_draft', { to: ['ana@client.com'], body: 'Hello', account_id: 'work' }]);
+    });
+
     it('rejects an invalid draft body with 400', async () => {
       expect((await send(port, 'POST', '/api/mail/drafts', { to: ['a@b.com'] })).status).toBe(400);
       expect((await send(port, 'POST', '/api/mail/drafts', { body: 'x' })).status).toBe(400);

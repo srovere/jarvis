@@ -74,8 +74,8 @@ export class TasksTools implements ToolGroup {
       {
         title: 'Create task',
         description:
-          'Create a task in the default task list of the first active account. Use it when the user asks to ' +
-          'remember or track something to do.',
+          'Create a task in the default task list of the first active account, or in the account_id / list_id you give ' +
+          '(list ids come from list_task_lists). Use it when the user asks to remember or track something to do.',
         inputSchema: {
           title: z.string().min(1).describe('Task title.'),
           notes: z.string().optional().describe('Optional details.'),

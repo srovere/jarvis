@@ -93,13 +93,15 @@ export class EmailTools implements ToolGroup {
         description:
           'Creates a DRAFT only. Never sends. The user reviews and sends it from Gmail. Use it whenever the user ' +
           'wants to write or answer an email. Give `to` for a new email, or `thread_id` to reply inside a thread ' +
-          '(recipients and "Re:" subject are then taken from the thread). Uses the first active account.',
+          '(recipients and "Re:" subject are then taken from the thread). Give `account_id` (the account that owns the thread) to ' +
+          'draft in that account; default the first active account.',
         inputSchema: {
           to: z.array(z.string()).optional().describe('Recipients ("Name <a@b.com>" or "a@b.com").'),
           cc: z.array(z.string()).optional().describe('Carbon-copy recipients.'),
           subject: z.string().optional().describe('Subject; defaults to "Re: <thread subject>" when replying.'),
           body: z.string().describe('Plain-text body.'),
           thread_id: z.string().min(1).optional().describe('Thread to reply in.'),
+          account_id: z.string().min(1).optional().describe('Account that owns the thread / sends from (active); default the first active account.'),
         },
         outputSchema: {
           draftId: z.string(),
@@ -109,7 +111,7 @@ export class EmailTools implements ToolGroup {
           gmailUrl: z.string(),
         },
       },
-      ({ to, cc, subject, body, thread_id }) =>
+      ({ to, cc, subject, body, thread_id, account_id }) =>
         this.runner.run('create_gmail_draft', async () => {
           const draft = await this.draft.execute({
             ...(to !== undefined ? { to } : {}),
@@ -117,6 +119,7 @@ export class EmailTools implements ToolGroup {
             ...(subject !== undefined ? { subject } : {}),
             body,
             ...(thread_id !== undefined ? { threadId: thread_id } : {}),
+            ...(account_id !== undefined ? { accountId: account_id } : {}),
           });
           return {
             text:

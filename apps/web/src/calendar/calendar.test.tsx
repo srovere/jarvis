@@ -94,6 +94,31 @@ describe('Calendar actions', () => {
     expect(posts).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm and block' }));
     expect(await within(dialog).findByText(/Focus time blocked/)).toBeInTheDocument();
-    expect(posts).toEqual([{ taskName: 'Write report', durationMinutes: 60 }]);
+    expect(posts).toEqual([{ taskName: 'Write report', durationMinutes: 60, preferredStartHour: 9 }]);
+  });
+});
+
+describe('Focus confirmation is bound to the shown slot', () => {
+  it('sends the shown slot hour and flags a different resulting slot', async () => {
+    mockShell();
+    mockEvents();
+    const posts: unknown[] = [];
+    server.use(
+      http.post('/api/calendar/free-slot', () => HttpResponse.json({ slot: { start: '2026-11-26T14:00:00.000+00:00', end: '2026-11-26T15:00:00.000+00:00' } })),
+      http.post('/api/calendar/focus', async ({ request }) => {
+        posts.push(await jsonBody(request));
+        return HttpResponse.json({ status: 'created', start: '2026-11-25T14:00:00.000+00:00', end: '2026-11-25T15:00:00.000+00:00' });
+      }),
+    );
+    renderAt();
+    await userEvent.click(await screen.findByRole('button', { name: 'Block focus time' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Deep work');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Find a slot' }));
+    await within(dialog).findByText('2026-11-26 14:00–15:00');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm and block' }));
+    expect(await within(dialog).findByText(/differs from the slot shown/)).toHaveTextContent('2026-11-26 14:00–15:00');
+    expect(within(dialog).getByText(/Focus time blocked/)).toHaveTextContent('2026-11-25 14:00–15:00');
+    expect(posts).toEqual([{ taskName: 'Deep work', durationMinutes: 90, preferredStartHour: 14 }]);
   });
 });

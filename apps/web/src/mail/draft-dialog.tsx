@@ -10,9 +10,9 @@ const GMAIL_DRAFTS = 'https://mail.google.com/mail/#drafts';
 const safeGmailUrl = (url: string | undefined) => (url?.startsWith('https://mail.google.com/') ? url : GMAIL_DRAFTS);
 
 /** Reply as a Gmail draft. Jarvis never sends email: the user reviews the draft in Gmail. */
-export function DraftDialog({ threadId, onClose }: { threadId: string; onClose: () => void }) {
+export function DraftDialog({ accountId, threadId, onClose }: { accountId: string; threadId: string; onClose: () => void }) {
   const [body, setBody] = useState('');
-  const draft = useMutation({ mutationFn: () => createDraft({ threadId, body: body.trim() }) });
+  const draft = useMutation({ mutationFn: () => createDraft({ threadId, accountId, body: body.trim() }) });
 
   return (
     <Dialog title="Reply as draft" onClose={onClose}>

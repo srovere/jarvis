@@ -37,6 +37,16 @@ describe('CreateDraft', () => {
     expect(r.threadId).toBe('t1');
   });
 
+  it('creates the draft in the requested account, not the first active one', async () => {
+    await f.addAccount('a2');
+    const first = vi.spyOn(f.providers.get('a1')!.mail, 'createDraft');
+    const second = vi.spyOn(f.providers.get('a2')!.mail, 'createDraft');
+    await uc.execute({ to: ['x@y.com'], body: 'hi', accountId: 'a2' });
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+    await expect(uc.execute({ to: ['x@y.com'], body: 'hi', accountId: 'zz' })).rejects.toThrow();
+  });
+
   it('rejects invalid addresses and inactive accounts', async () => {
     await expect(uc.execute({ to: ['nope'], body: 'x' })).rejects.toThrow(new DomainError('Invalid address: nope'));
     await expect(uc.execute({ to: ['a@b.com'], cc: ['bad'], body: 'x' })).rejects.toThrow('Invalid address: bad');

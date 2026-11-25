@@ -75,6 +75,7 @@ const DraftBody = z
     subject: z.string().optional(),
     body: z.string().min(1),
     threadId: id.optional(),
+    accountId: id.optional(),
   })
   .refine((d) => (d.to?.length ?? 0) > 0 || d.threadId !== undefined, { message: 'give to or threadId', path: ['to'] });
 
@@ -111,7 +112,7 @@ export class MailController {
   @Post('drafts')
   draft(@Body() body: unknown) {
     const d = parse(DraftBody, body);
-    return this.mcp.call('create_gmail_draft', defined({ to: d.to, cc: d.cc, subject: d.subject, body: d.body, thread_id: d.threadId }));
+    return this.mcp.call('create_gmail_draft', defined({ to: d.to, cc: d.cc, subject: d.subject, body: d.body, thread_id: d.threadId, account_id: d.accountId }));
   }
 }
 

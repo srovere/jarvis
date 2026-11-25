@@ -33,6 +33,24 @@ describe('Mail search', () => {
   });
 });
 
+describe('Draft for a second-account thread', () => {
+  it('posts the accountId from the route', async () => {
+    mockShell([account(), account({ id: 'a2', email: 'b@example.com' })]);
+    let body: unknown;
+    server.use(
+      http.get('/api/mail/threads/a2/t7', () => HttpResponse.json({ threadId: 't7', subject: msg.subject, messages: [{ ...msg, accountId: 'a2', threadId: 't7' }] })),
+      http.post('/api/mail/drafts', async ({ request }) => ((body = await jsonBody(request)), HttpResponse.json({ draftId: 'd2', to: [], subject: 'Re', gmailUrl: 'https://mail.google.com/mail/#drafts/d2' }))),
+    );
+    renderAt('/mail/a2/t7');
+    await userEvent.click(await screen.findByRole('button', { name: 'Reply' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Message'), 'Hi');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save draft' }));
+    await within(dialog).findByRole('link', { name: 'Open in Gmail' });
+    expect(body).toEqual({ threadId: 't7', accountId: 'a2', body: 'Hi' });
+  });
+});
+
 describe('Thread and draft dialog', () => {
   function mockThread() {
     mockShell();
@@ -65,7 +83,7 @@ describe('Thread and draft dialog', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save draft' }));
     const open = await within(dialog).findByRole('link', { name: 'Open in Gmail' });
     expect(open).toHaveAttribute('href', 'https://mail.google.com/mail/#drafts/d1');
-    expect(body).toEqual({ threadId: 't1', body: 'Looks good' });
+    expect(body).toEqual({ threadId: 't1', accountId: 'a1', body: 'Looks good' });
     expect(screen.queryAllByText(/send/i)).toEqual([]);
   });
 });
