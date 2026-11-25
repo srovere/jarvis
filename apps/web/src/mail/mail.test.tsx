@@ -61,7 +61,7 @@ describe('Thread and draft dialog', () => {
     mockThread();
     renderAt('/mail/a1/t1');
     expect(await screen.findByText(/<img src=x onerror=alert\(1\)> Please review/)).toBeInTheDocument();
-    expect(document.querySelector('img')).toBeNull();
+    expect(document.querySelector('img[src="x"]')).toBeNull();
   });
 
   it('never offers Send, posts the draft body and links to Gmail', async () => {

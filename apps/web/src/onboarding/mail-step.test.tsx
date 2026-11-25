@@ -11,12 +11,17 @@ const renderAt = (path: string) => render(<App router={createTestRouter([path])}
 const file = (content: string) => new File([content], 'client.json', { type: 'application/json' });
 
 describe('mail step', () => {
-  it('shows the Google Cloud guide with four items while no client is stored', async () => {
+  it('shows the Google Cloud guide with six items while no client is stored', async () => {
     mockOnboarding({ setup: fresh });
     renderAt('/onboarding/mail');
     expect(await screen.findByText('Create a Google Cloud project')).toBeInTheDocument();
-    expect(screen.getAllByRole('group')).toHaveLength(4);
-    expect(screen.getByRole('link', { name: /OAuth consent screen/ })).toHaveAttribute('href', expect.stringContaining('console.cloud.google.com'));
+    expect(screen.getAllByRole('group')).toHaveLength(6);
+    expect(screen.getByRole('link', { name: 'Branding' })).toHaveAttribute('href', expect.stringContaining('/auth/branding'));
+    expect(screen.getByText('Application privacy policy link')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Data access' })).toHaveAttribute('href', expect.stringContaining('/auth/scopes'));
+    expect(screen.getByRole('link', { name: 'Clients' })).toHaveAttribute('href', expect.stringContaining('/auth/clients'));
+    expect(screen.getByText('https://www.googleapis.com/auth/calendar.calendarlist.readonly')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Google Auth platform/ })).toHaveAttribute('href', expect.stringContaining('console.cloud.google.com'));
     expect(screen.getByRole('button', { name: 'Connect with Google' })).toBeDisabled();
   });
 

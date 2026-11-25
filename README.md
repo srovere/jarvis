@@ -39,14 +39,23 @@ The wizard shows these steps with links; in short:
 
 1. Create a project in <https://console.cloud.google.com/> and enable the **Gmail API**, **Google Calendar API** and
    **Google Tasks API**.
-2. *OAuth consent screen*: user type **External**, add exactly these 5 scopes (never `https://mail.google.com/`):
+2. *Menu > Google Auth platform > Get started*: app name and support email, audience **External**, contact email,
+   accept the policy and *Create*. This wizard does not ask for scopes.
+   Then, in *Google Auth platform > Branding*, complete *App domain* (required by Google): *Application home page*,
+   *Application privacy policy link* and *Application terms of service link*, and under *Authorized domains* add the
+   domain of those pages (e.g. `yourname.github.io` for a GitHub Pages site). The pages must be public and on a domain
+   you own; Google may ask you to verify it in [Google Search Console](https://search.google.com/search-console).
+   *Save*.
+3. *Google Auth platform > Data access > Add or remove scopes*: under *Manually add scopes* paste exactly these 5
+   (never `https://mail.google.com/`), *Add to table*, *Update*, then *Save*:
    `gmail.readonly`, `gmail.compose`, `calendar.events`, `tasks` and `calendar.calendarlist.readonly`
-   (all under `https://www.googleapis.com/auth/`). Add yourself as a test user.
-3. **Publish the app to production.** In *Testing* mode Google expires the refresh token after 7 days. Because it is
-   your own unverified app you will see "Google hasn't verified this app" when connecting: choose *Advanced > Go to
-   Jarvis (unsafe)*.
-4. *Credentials > Create credentials > OAuth client ID*, type **Desktop app**; download the JSON and upload it in the
-   wizard. Jarvis stores it in its data volume (mode `0600`) and never shows it again.
+   (all under `https://www.googleapis.com/auth/`).
+4. *Google Auth platform > Audience*: add yourself under *Test users*, then **Publish app**. In *Testing* mode Google
+   expires the refresh token after 7 days. Because it is your own unverified app you will see "Google hasn't verified
+   this app" when connecting: choose *Advanced > Go to Jarvis (unsafe)*.
+5. *Google Auth platform > Clients > Create client*, application type **Desktop app**, any name, *Create*; in the
+   dialog click *Download JSON* (Google may only show the secret then; if you missed it, create a new client) and
+   upload the file in the wizard. Jarvis stores it in its data volume (mode `0600`) and never shows it again.
 
 ### Claude token (optional)
 

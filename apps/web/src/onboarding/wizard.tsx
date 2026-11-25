@@ -63,6 +63,7 @@ function Wizard() {
   return (
     <div className="mx-auto grid max-w-4xl grid-cols-[14rem_1fr] gap-8 p-6">
       <aside>
+        <img src="/logo.png" alt="" className="mb-3 h-16 w-16 rounded-lg" />
         <h1 className="mb-4 text-xl font-semibold">Set up Jarvis</h1>
         <StepList />
       </aside>

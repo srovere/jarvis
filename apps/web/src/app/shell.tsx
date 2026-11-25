@@ -18,7 +18,10 @@ export function Shell() {
   return (
     <div className="flex h-screen bg-neutral-50 text-neutral-900">
       <nav aria-label="Main" className="flex w-48 shrink-0 flex-col gap-1 border-r border-neutral-200 bg-white p-3">
-        <div className="mb-3 px-3 text-lg font-semibold">Jarvis</div>
+        <div className="mb-3 flex items-center gap-2 px-3 text-lg font-semibold">
+          <img src="/logo.png" alt="" className="h-8 w-8 rounded-md" />
+          Jarvis
+        </div>
         {NAV.map((item) => (
           <NavLink
             key={item.to}
