@@ -120,8 +120,11 @@ export const getEvents = (from: string, to: string) =>
   api<{ events: EventItem[] }>(`/api/calendar/events?from=${from}&to=${to}`);
 export const findFreeSlot = (durationMinutes: number) =>
   api<{ slot: Slot | null }>('/api/calendar/free-slot', { method: 'POST', body: { durationMinutes } });
-export const blockFocus = (taskName: string, durationMinutes: number, preferredStartHour?: number) =>
-  api<FocusResult>('/api/calendar/focus', { method: 'POST', body: { taskName, durationMinutes, ...(preferredStartHour !== undefined ? { preferredStartHour } : {}) } });
+export const blockFocus = (taskName: string, durationMinutes: number, preferredStartHour?: number, accountId?: string) =>
+  api<FocusResult>('/api/calendar/focus', {
+    method: 'POST',
+    body: { taskName, durationMinutes, ...(preferredStartHour !== undefined ? { preferredStartHour } : {}), ...(accountId ? { accountId } : {}) },
+  });
 
 export const getTasks = (status: TaskStatus) => api<{ tasks: TaskItem[] }>(`/api/tasks?status=${status}`);
 export const getTaskLists = () => api<{ lists: TaskList[] }>('/api/tasks/lists');

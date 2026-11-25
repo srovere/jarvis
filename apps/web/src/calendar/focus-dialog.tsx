@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useAccounts } from '@/api/hooks';
+import { AccountSelector } from '@/components/account-selector';
 import { blockFocus, findFreeSlot, type Slot } from '@/api/data';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -11,10 +13,15 @@ export function FocusDialog({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('90');
+  const [accountId, setAccountId] = useState('');
+  const accounts = useAccounts();
+  const active = (accounts.data ?? []).filter((a) => a.status === 'active');
+  const chosen = active.length > 1 ? (accountId || active[0]!.id) : '';
+  const chosenEmail = active.find((a) => a.id === chosen)?.email;
   const [slot, setSlot] = useState<Slot | null | undefined>(undefined);
   const find = useMutation({ mutationFn: () => findFreeSlot(Number(duration)), onSuccess: (r) => setSlot(r.slot) });
   const block = useMutation({
-    mutationFn: () => blockFocus(name.trim(), Number(duration), slot ? Number(slot.start.slice(11, 13)) : undefined),
+    mutationFn: () => blockFocus(name.trim(), Number(duration), slot ? Number(slot.start.slice(11, 13)) : undefined, chosen || undefined),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
   });
   const reset = () => {
@@ -33,6 +40,7 @@ export function FocusDialog({ onClose }: { onClose: () => void }) {
           <span>Duration (minutes)</span>
           <Input type="number" min={15} max={480} value={duration} onChange={(e) => (setDuration(e.target.value), reset())} />
         </label>
+        <AccountSelector value={chosen} onChange={(id) => (setAccountId(id), reset())} />
         {slot === undefined && (
           <Button disabled={!name.trim() || find.isPending} onClick={() => find.mutate()}>
             Find a slot
@@ -42,7 +50,7 @@ export function FocusDialog({ onClose }: { onClose: () => void }) {
         {slot && !block.isSuccess && (
           <div className="space-y-2">
             <p className="text-sm">
-              Proposed slot: <strong>{fmtSlot(slot)}</strong>. This will create a calendar event.
+              Proposed slot: <strong>{fmtSlot(slot)}</strong>. This will create a calendar event{chosenEmail ? ` in ${chosenEmail}` : ''}.
             </p>
             <Button disabled={block.isPending} onClick={() => block.mutate()}>
               Confirm and block

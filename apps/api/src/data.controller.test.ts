@@ -331,6 +331,16 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
       expect(r.json.status).toBe('created');
       expect((await send(port, 'POST', '/api/calendar/focus', { durationMinutes: 60 })).status).toBe(400);
     });
+
+    it('blocks focus time on the chosen account and rejects an unknown one', async () => {
+      const r = await send(port, 'POST', '/api/calendar/focus', { taskName: 'Work block', durationMinutes: 30, accountId: 'work' });
+      expect(r.status).toBe(200);
+      expect(r.json.status).toBe('created');
+      const stored = await repos.events.inRange(['work'], new TimeRange(at('2026-11-23T00:00:00'), at('2026-12-07T00:00:00')));
+      expect(stored.map((e) => e.title)).toContain('[Focus] Work block');
+      const bad = await send(port, 'POST', '/api/calendar/focus', { taskName: 'X', durationMinutes: 30, accountId: 'nope' });
+      expect(bad.status).toBeGreaterThanOrEqual(400);
+    });
   });
 
   describe('tasks', () => {

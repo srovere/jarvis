@@ -118,7 +118,7 @@ export class MailController {
 
 const EventsQuery = z.object({ from: isoDateOrDateTime.optional(), to: isoDateOrDateTime.optional() });
 const FreeSlotBody = z.object({ durationMinutes: duration, preferredStartHour });
-const FocusBody = FreeSlotBody.extend({ taskName: z.string().trim().min(1) });
+const FocusBody = FreeSlotBody.extend({ taskName: z.string().trim().min(1), accountId: id.optional() });
 
 @Controller('api/calendar')
 export class CalendarController {
@@ -155,7 +155,7 @@ export class CalendarController {
     const b = parse(FocusBody, body);
     return this.mcp.call(
       'block_focus_time',
-      defined({ task_name: b.taskName, duration_minutes: b.durationMinutes, preferred_start_hour: b.preferredStartHour }),
+      defined({ task_name: b.taskName, duration_minutes: b.durationMinutes, preferred_start_hour: b.preferredStartHour, account_id: b.accountId }),
     );
   }
 }

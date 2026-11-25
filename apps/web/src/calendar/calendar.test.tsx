@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '@/app/app';
 import { createTestRouter } from '@/app/router';
-import { jsonBody, mockShell } from '@/test/fixtures';
+import { account, jsonBody, mockShell } from '@/test/fixtures';
 import { server } from '@/test/server';
 
 beforeEach(() => vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-25T12:00:00Z') })); // a Wednesday
@@ -95,6 +95,41 @@ describe('Calendar actions', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm and block' }));
     expect(await within(dialog).findByText(/Focus time blocked/)).toBeInTheDocument();
     expect(posts).toEqual([{ taskName: 'Write report', durationMinutes: 60, preferredStartHour: 9 }]);
+  });
+});
+
+describe('Focus account choice', () => {
+  it('offers the account selector with two active accounts and posts the choice', async () => {
+    mockShell([account({ id: 'a1', email: 'a@example.com' }), account({ id: 'a2', email: 'b@example.com' })]);
+    mockEvents();
+    const posts: unknown[] = [];
+    server.use(
+      http.post('/api/calendar/free-slot', () => HttpResponse.json({ slot: { start: '2026-11-26T09:00:00.000+00:00', end: '2026-11-26T10:30:00.000+00:00' } })),
+      http.post('/api/calendar/focus', async ({ request }) => {
+        posts.push(await jsonBody(request));
+        return HttpResponse.json({ status: 'created', start: '2026-11-26T09:00:00.000+00:00', end: '2026-11-26T10:30:00.000+00:00' });
+      }),
+    );
+    renderAt();
+    await userEvent.click(await screen.findByRole('button', { name: 'Block focus time' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.selectOptions(await within(dialog).findByRole('combobox', { name: 'Account' }), 'a2');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Deep work');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Find a slot' }));
+    await within(dialog).findByText('2026-11-26 09:00–10:30');
+    expect(within(dialog).getByText(/This will create a calendar event in b@example.com/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm and block' }));
+    await within(dialog).findByText(/Focus time blocked/);
+    expect(posts).toEqual([{ taskName: 'Deep work', durationMinutes: 90, preferredStartHour: 9, accountId: 'a2' }]);
+  });
+
+  it('shows no selector with a single account', async () => {
+    mockShell();
+    mockEvents();
+    renderAt();
+    await userEvent.click(await screen.findByRole('button', { name: 'Block focus time' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('combobox', { name: 'Account' })).not.toBeInTheDocument();
   });
 });
 

@@ -328,6 +328,12 @@ describe('mcp-server (Streamable HTTP)', () => {
     const focus = await call(client, 'block_focus_time', { task_name: 'Report', duration_minutes: 60 });
     expect(focus.structuredContent).toMatchObject({ status: 'created', start: '2026-11-23T09:00:00.000-03:00' });
 
+    const onAccount = await call(client, 'block_focus_time', { task_name: 'Other', duration_minutes: 30, account_id: 'personal' });
+    expect(onAccount.structuredContent).toMatchObject({ status: 'created' });
+    const badAccount = await call(client, 'block_focus_time', { task_name: 'Nope', account_id: 'nope' });
+    expect(badAccount.isError).toBe(true);
+    expect((await client.listTools()).tools.find((t) => t.name === 'block_focus_time')?.description).toContain('account_id');
+
     const created = await call(client, 'create_task', { title: 'Call Ana', due: '2026-11-25' });
     expect(created.structuredContent).toMatchObject({ title: 'Call Ana', list: 'My tasks' });
 
@@ -421,7 +427,7 @@ describe('mcp-server (Streamable HTTP)', () => {
     expect(await world.syncRequests.pending()).toEqual([]);
     const r = await call(client, 'trigger_sync');
     expect(r.structuredContent).toEqual({ requested: ['personal'] });
-    expect(await world.syncRequests.pending()).toEqual(['personal']);
+    expect((await world.syncRequests.pending()).map((r) => r.accountId)).toEqual(['personal']);
     const one = await call(client, 'trigger_sync', { account_id: 'personal' });
     expect(one.structuredContent).toEqual({ requested: ['personal'] });
   });

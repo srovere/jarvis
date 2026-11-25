@@ -137,14 +137,15 @@ export class CalendarTools implements ToolGroup {
       {
         title: 'Block focus time',
         description:
-          'Reserve a focus block for a task on the primary calendar of the first active account, in the first ' +
-          'free working-hours slot over the next work days. Use it when the user wants time set aside to work on ' +
+          'Reserve a focus block for a task on the primary calendar of the first active account (or of the account ' +
+          'given by account_id), in the first free working-hours slot over the next work days. Use it when the user wants time set aside to work on ' +
           'something. Idempotent: if an upcoming block for the same task already exists it is returned ' +
           '(status "already_exists"); status "no_slot" means nothing fits.',
         inputSchema: {
           task_name: z.string().min(1).describe('What the focus time is for; it becomes the event title.'),
           duration_minutes: durationMinutes,
           preferred_start_hour: preferredStartHour,
+          account_id: z.string().min(1).optional().describe('Account that receives the event; default: the first active account.'),
         },
         outputSchema: {
           status: z.enum(['created', 'already_exists', 'no_slot']),
@@ -155,12 +156,13 @@ export class CalendarTools implements ToolGroup {
           searchedWorkDays: z.number().optional(),
         },
       },
-      ({ task_name, duration_minutes, preferred_start_hour }) =>
+      ({ task_name, duration_minutes, preferred_start_hour, account_id }) =>
         this.runner.run('block_focus_time', async () => {
           const result = await this.focus.execute({
             taskName: task_name,
             durationMinutes: duration_minutes,
             ...(preferred_start_hour !== undefined ? { preferredStartHour: preferred_start_hour } : {}),
+            ...(account_id !== undefined ? { accountId: account_id } : {}),
           });
           return { text: focusSummary(task_name, result), structured: result };
         }),

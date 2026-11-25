@@ -112,6 +112,15 @@ describe('BlockFocusTime', () => {
     });
   });
 
+  it('creates the block on the chosen account instead of the first active one', async () => {
+    await f.addAccount('a2');
+    const r = await build().execute({ taskName: 'Deep work', accountId: 'a2' });
+    expect(r.status).toBe('created');
+    const range = event('x', 'a2', '2026-11-24T00:00:00', '2026-11-26T00:00:00').range;
+    expect(await f.repos.events.inRange(['a2'], range)).toHaveLength(1);
+    expect(await f.repos.events.inRange(['a1'], range)).toHaveLength(0);
+  });
+
   it('rejects an account that needs reauth, and fails without active accounts', async () => {
     await f.addAccount('a2', 'needs_reauth');
     await expect(build().execute({ taskName: 'X', accountId: 'a2' })).rejects.toThrow(new DomainError('Account not active: a2'));
