@@ -106,3 +106,7 @@ export const verifyAgent = (kind: string) =>
 export const skipAgent = () => api<void>('/api/agent/skip', { method: 'POST' });
 
 export const googleConnectUrl = '/api/oauth/google/start?returnTo=/onboarding';
+
+/** `deleteData` travels in the query string, as the API expects; the body is the required (empty) JSON. */
+export const removeAccount = (accountId: string, deleteData: boolean) =>
+  api<void>(`/api/accounts/${encodeURIComponent(accountId)}?deleteData=${deleteData}`, { method: 'DELETE' });

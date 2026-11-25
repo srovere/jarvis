@@ -1,15 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ApiError, saveAgentToken, skipAgent, verifyAgent } from '@/api/client';
+import { saveAgentToken, skipAgent, verifyAgent } from '@/api/client';
 import { queryKeys, useProviders, useSetupStatus } from '@/api/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-
-const API_KEY_MESSAGE =
-  'This looks like an Anthropic API key (sk-ant-api…). Jarvis never uses API keys: run `claude setup-token` and paste the subscription token it prints.';
-
-const messageOf = (e: unknown) => (e instanceof ApiError ? e.message : 'Something went wrong. Try again.');
+import { messageOf, tokenProblem } from './agent-token';
 
 export function AgentStep() {
   const qc = useQueryClient();
@@ -40,8 +36,8 @@ export function AgentStep() {
   function submit() {
     const value = token.trim();
     setFormError(null);
-    if (value === '') return setFormError('Paste the token first.');
-    if (value.startsWith('sk-ant-api')) return setFormError(API_KEY_MESSAGE);
+    const problem = tokenProblem(value);
+    if (problem) return setFormError(problem);
     verify.mutate(value);
   }
 

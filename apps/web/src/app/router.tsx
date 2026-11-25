@@ -5,7 +5,7 @@ import { CalendarPage } from '@/calendar/calendar-page';
 import { MailPage } from '@/mail/mail-page';
 import { ThreadPage } from '@/mail/thread-page';
 import { onboardingRoutes } from '@/onboarding/wizard';
-import { Placeholder } from '@/pages/placeholder';
+import { settingsRoutes } from '@/settings/settings-page';
 import { TasksPage } from '@/tasks/tasks-page';
 import { TodayPage } from '@/today/today-page';
 import { Shell } from './shell';
@@ -40,7 +40,7 @@ export const routes: RouteObject[] = [
           { path: '/mail/:accountId/:threadId', element: <ThreadPage /> },
           { path: '/calendar', element: <CalendarPage /> },
           { path: '/tasks', element: <TasksPage /> },
-          { path: '/settings/*', element: <Placeholder title="Settings" /> },
+          settingsRoutes,
         ],
       },
     ],
