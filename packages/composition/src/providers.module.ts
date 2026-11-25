@@ -55,6 +55,7 @@ import {
   type AgentRunner,
   type AgentStatusStore,
   type Clock,
+  type SettingsProvider,
   type SettingsStore,
 } from '@jarvis/core';
 import {
@@ -129,7 +130,12 @@ export class ProvidersModule implements OnApplicationShutdown {
       construct(T.EventRepository, DrizzleEventRepository, [DB]),
       construct(T.TaskRepository, DrizzleTaskRepository, [DB]),
       { provide: T.PersonLinkLookup, useClass: NullPersonLinkLookup },
-      { provide: GOOGLE_AUTH, useFactory: () => buildGoogleAuth(config, configDir, process.env.JARVIS_DATA_DIR) },
+      {
+        provide: GOOGLE_AUTH,
+        useFactory: (settings: SettingsProvider) =>
+          buildGoogleAuth(config, configDir, process.env.JARVIS_DATA_DIR, async () => (await settings.current()).zone),
+        inject: [T.SettingsProvider],
+      },
       { provide: T.ProviderRegistry, useFactory: (g: GoogleAuth) => g.registry, inject: [GOOGLE_AUTH] },
       { provide: GOOGLE_CLIENT_STATUS, useFactory: (g: GoogleAuth) => g.secrets, inject: [GOOGLE_AUTH] },
       { provide: GOOGLE_CLIENT_STORE, useFactory: (g: GoogleAuth) => new GoogleClientUpload(g.secrets), inject: [GOOGLE_AUTH] },
@@ -237,7 +243,12 @@ export interface GoogleAuth {
  * Token dir follows the existing configuration (`dataDir/tokens`); the client is the uploaded one under
  * `dataDirEnv` (default `/data`) with the phase-1 `secretsDir/google_oauth_client` as fallback.
  */
-export function buildGoogleAuth(config: JarvisConfig, configDir: string, dataDirEnv?: string): GoogleAuth {
+export function buildGoogleAuth(
+  config: JarvisConfig,
+  configDir: string,
+  dataDirEnv?: string,
+  zone: () => Promise<string> = async () => config.timezone,
+): GoogleAuth {
   const { tokenDir } = authPaths(config, configDir);
   const secrets = new GoogleClientSecretStore({
     dataDir: dataDirEnv?.trim() || '/data',
@@ -246,6 +257,6 @@ export function buildGoogleAuth(config: JarvisConfig, configDir: string, dataDir
   const store = new FileTokenStore(tokenDir);
   const flow = new GoogleOAuthFlow(secrets, store);
   const registry = new ProviderRegistry();
-  registry.register(new GoogleProviderFactory(flow, config.timezone));
+  registry.register(new GoogleProviderFactory(flow, zone));
   return { registry, connector: new GoogleAccountConnector(secrets, store), flow, secrets };
 }
