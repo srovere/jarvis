@@ -26,6 +26,10 @@ the images, starts the stack and prints `Open http://127.0.0.1:3000`. Open it: t
 3. **Preferences**: time zone, work hours, work days, calendars that block time.
 4. **Done**: the first sync starts right away; *Go to dashboard* opens Today.
 
+In the dashboard you can search mail and reply as a **draft**, find free slots and block focus time, and create or
+complete tasks. With more than one account connected, every action asks which account to use. *Sync now* in the
+header syncs right away; connecting an account also starts a sync.
+
 Other commands: `./jarvis stop` (data is kept), `./jarvis status`, `./jarvis logs [api|worker|mcp-server|db]`.
 `./jarvis start` is idempotent: run it again after pulling changes to rebuild.
 

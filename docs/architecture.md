@@ -1,11 +1,15 @@
 # Jarvis Architecture
 
-> Living document. It describes **how Jarvis is built**. The **why** and the scope decisions are in
-> [`superpowers/specs/2026-11-23-jarvis-design.md`](superpowers/specs/2026-11-23-jarvis-design.md).
+> Living document. It describes **how Jarvis is built today** (phases 1 and 4a: Google sync, MCP server, dashboard
+> and onboarding). Parts of the design that are not built yet are grouped in §10, *Planned*. The **why** and the
+> scope decisions are in [`superpowers/specs/2026-11-23-jarvis-design.md`](superpowers/specs/2026-11-23-jarvis-design.md)
+> and [`superpowers/specs/2026-11-24-jarvis-dashboard-onboarding-design.md`](superpowers/specs/2026-11-24-jarvis-dashboard-onboarding-design.md).
 
 ## 1. Context view
 
-Jarvis is a personal assistant that runs locally in Docker. It integrates email, calendar and task providers, reads the state of development projects on several servers and uses an AI agent (Claude Code, with the user's subscription) to summarize, answer questions and propose actions.
+Jarvis is a personal assistant that runs locally in Docker. Today it syncs Gmail, Google Calendar and Google Tasks,
+shows them in a local dashboard and exposes them to Claude through an MCP server. The Claude subscription token is
+verified with the Claude Code CLI; the chat agent comes in phase 3. Dashed arrows are planned.
 
 ```mermaid
 flowchart LR
@@ -13,23 +17,19 @@ flowchart LR
   subgraph Host["Jarvis host (Docker Compose)"]
     J[Jarvis]
   end
-  CC[Claude Code<br/>in the terminal]
+  CC[Claude Code / Desktop<br/>MCP Inspector]
   G[(Google<br/>Gmail · Calendar · Tasks)]
-  MS[(Microsoft 365<br/>future)]
-  S1[[Dev server 1<br/>repos + ~/.claude]]
-  S2[[Dev server N]]
-  L[[Local folders<br/>repos + ~/.claude]]
   AI[Claude<br/>subscription]
+  MS[(Microsoft 365)]
+  S1[[Dev servers<br/>repos + ~/.claude]]
 
   U -- browser --> J
   U -- uses --> CC
   CC -- MCP --> J
   J -- OAuth/REST --> G
-  J -. future .-> MS
-  J -- restricted SSH --> S1
-  J -- restricted SSH --> S2
-  J -- volumes --> L
-  J -- claude -p --> AI
+  J -- "claude -p (verify)" --> AI
+  J -. planned .-> MS
+  J -. "planned: SSH / volumes" .-> S1
 ```
 
 ## 2. Containers (Docker Compose)
@@ -61,9 +61,9 @@ flowchart TB
 
 | Container | Role | Exposes |
 |---|---|---|
-| `api` | Serves the built dashboard and `/api/*`. User data goes through an **MCP client** to `mcp-server`; installation state (setup status, accounts, OAuth, settings, agent) through application services. Ships the pinned Claude Code CLI to verify the subscription token. Rejects any `Host`/`Origin` other than `127.0.0.1:3000`/`localhost:3000`. | `127.0.0.1:3000` |
-| `mcp-server` | **The agents' only gateway** to data and actions: domain tools on top of `core`. | `127.0.0.1:3002` (bearer token) |
-| `worker` | Sync jobs; reads settings and active accounts at every tick. | none |
+| `api` | Serves the built dashboard and `/api/*` (§6). User data goes through an **MCP client** to `mcp-server`; installation state (setup status, accounts, OAuth, settings, agent) through application services. Ships the pinned Claude Code CLI to verify the subscription token. | `127.0.0.1:3000` |
+| `mcp-server` | **The only gateway** to user data and actions: domain tools on top of `core`. | `127.0.0.1:3002` (bearer token) |
+| `worker` | Sync scheduler; reads settings and active accounts at runtime. | none |
 | `migrate` | Applies the database migrations and exits; `api`, `worker` and `mcp-server` wait for it. | none |
 | `db` | PostgreSQL 17 (`pgdata` volume). | internal network only |
 
@@ -77,312 +77,238 @@ The YAML config and the legacy `google_oauth_client` secret are optional and not
 
 ```mermaid
 flowchart TB
-  subgraph apps["apps/* (delivery layer · NestJS)"]
-    A1[api<br/>controllers · SSE]
+  subgraph apps["apps/* (delivery layer)"]
+    A1[api<br/>REST controllers]
     A2[mcp-server<br/>MCP tools]
-    A3[worker<br/>jobs]
+    A3[worker<br/>scheduler · CLI]
+    A4[web<br/>React SPA]
+  end
+  subgraph comp["packages/composition (wiring)"]
+    PM[ProvidersModule · LayeredSettings<br/>GoogleClientStore · paths · logger]
   end
   subgraph app["packages/core/application (use cases)"]
-    UC[GetDailyBriefing · BlockFocusTime · CreateDraft<br/>SyncAccount · DiscoverProjects · RefreshHighlights<br/>LinkEntity · ProposeAction · ApproveAction …]
+    UC[GetDailyBriefing · SearchEmails · ReadThread · CreateDraft<br/>ListEvents · FindFreeSlot · BlockFocusTime · ListTasks · CreateTask · CompleteTask<br/>SyncAccount · RequestSync · GetSyncStatus · ConnectAccount · RemoveAccount<br/>ConnectAgent · SetBusyCalendars · ImportConfig]
   end
   subgraph dom["packages/core/domain (pure TS)"]
-    E[Entities and value objects<br/>MailThread · CalendarEvent · Task · Project · Person · Account]
-    S[Domain services<br/>FreeSlotFinder · ThreadLinker · EmailCleaner · PriorityRules]
-    P[Ports (interfaces)]
+    E[Model<br/>Account · MailThread · CalendarEvent · Task · Preferences · AgentStatus]
+    S[Services<br/>FreeSlotFinder · EmailCleaner · PriorityRules]
+    P[Ports]
   end
-  subgraph adapters["packages/adapters-* (infrastructure)"]
+  subgraph adapters["infrastructure packages"]
     AG[adapters-google]
-    AT[adapters-transport<br/>local · ssh]
-    AA[adapters-agent<br/>claude-code]
+    AC[adapters-claude]
     AP[adapters-persistence<br/>drizzle/postgres]
+    CF[config<br/>YAML + env]
   end
+  A4 -. HTTP .-> A1
+  apps --> comp
   apps --> app
+  comp --> adapters
   app --> dom
   adapters -- implement --> P
-  apps -. composition (DI) .-> adapters
 ```
 
-**Dependency rule:** arrows point inwards. `domain` imports nothing external; `application` only imports `domain`; adapters import `domain` (to implement ports) and their SDKs; apps are the **composition root** that wires everything together with NestJS dependency injection. A lint rule (`dependency-cruiser`) enforces this.
+**Dependency rule:** arrows point inwards. `domain` imports nothing external; `application` only imports `domain`;
+adapters import `domain` (to implement ports) and their SDKs; `composition` and the apps are the composition root that
+wires everything with NestJS dependency injection. `web` only talks to `api` over HTTP. `dependency-cruiser`
+(`pnpm lint:deps`) enforces the rules.
 
-## 4. Main ports
+## 4. Ports and adapters
 
-```mermaid
-classDiagram
-  direction LR
-  class MailReader {
-    <<interface>>
-    +listThreads(query, page) MailThreadSummary[]
-    +getThread(id) MailThread
-    +sync(cursor) SyncResult~MailChange~
-  }
-  class DraftWriter {
-    <<interface>>
-    +createDraft(DraftRequest) DraftRef
-  }
-  class CalendarReader {
-    <<interface>>
-    +listEvents(range, calendars) CalendarEvent[]
-    +sync(cursor) SyncResult~EventChange~
-  }
-  class EventWriter {
-    <<interface>>
-    +createEvent(NewEvent) EventRef
-  }
-  class TaskReader {
-    <<interface>>
-    +listLists() TaskList[]
-    +sync(cursor) SyncResult~TaskChange~
-  }
-  class TaskWriter {
-    <<interface>>
-    +createTask(listId, NewTask) TaskRef
-    +completeTask(ref)
-    +createList(name) TaskList
-  }
-  class IdentityProvider {
-    <<interface>>
-    +ownAddresses() EmailAddress[]
-  }
-  class ProjectTransport {
-    <<interface>>
-    +listClaudeProjects() ClaudeProjectDir[]
-    +readFile(path) FileContent
-    +stat(path) FileStat
-    +gitLog(repo, since) Commit[]
-    +gitStatus(repo) GitStatus
-    +gitRemote(repo) string
-    +writeJarvisFile(repo, relPath, content)
-    +ensureGitExclude(repo)
-  }
-  class AgentRunner {
-    <<interface>>
-    +run(AgentRequest) AsyncIterable~AgentEvent~
-    +capabilities() AgentCapabilities
-  }
-  class Summarizer {
-    <<interface>>
-    +projectHighlights(ProjectContext) Highlights
-    +meetingBrief(MeetingContext) Brief
-    +suggestProject(ThreadContext) ProjectSuggestion
-  }
-  class GmailAdapter
-  class GoogleCalendarAdapter
-  class GoogleTasksAdapter
-  class LocalTransport
-  class SshTransport
-  class ClaudeCodeRunner
-  class AgentSummarizer
+| Port (`packages/core/src/domain/ports`) | Implemented by |
+|---|---|
+| `MailReader`, `DraftWriter`, `IdentityProvider` | `adapters-google` (Gmail) |
+| `CalendarReader`, `EventWriter` | `adapters-google` (Calendar) |
+| `TaskReader`, `TaskWriter` | `adapters-google` (Tasks) |
+| `AccountConnector` (OAuth start/complete) | `adapters-google` (OAuth) |
+| `ProviderFactory` → `ProviderBundle` | `GoogleProviderFactory` |
+| `AgentRunner`, `AgentCredentialStore`, `AgentStatusStore` | `adapters-claude` (`ClaudeCliRunner`, file stores under `/data/agent`) |
+| `AccountRepository`, `SyncStateRepository`, `MailRepository`, `EventRepository`, `TaskRepository`, `PersonLinkLookup`, `SettingsStore`, `SyncRequests` | `adapters-persistence` (Drizzle) |
+| `Clock` | `composition` (`SystemClock`) |
 
-  MailReader <|.. GmailAdapter
-  DraftWriter <|.. GmailAdapter
-  IdentityProvider <|.. GmailAdapter
-  CalendarReader <|.. GoogleCalendarAdapter
-  EventWriter <|.. GoogleCalendarAdapter
-  TaskReader <|.. GoogleTasksAdapter
-  TaskWriter <|.. GoogleTasksAdapter
-  ProjectTransport <|.. LocalTransport
-  ProjectTransport <|.. SshTransport
-  AgentRunner <|.. ClaudeCodeRunner
-  Summarizer <|.. AgentSummarizer
-  AgentSummarizer --> AgentRunner
-```
+`ProviderBundle` groups what one account offers (`mail?`, `calendar?`, `tasks?`, `identity`, `capabilities`).
+Provider differences are queried through `ProviderCapabilities`, never with `instanceof`.
 
-In addition, one repository port per aggregate (`AccountRepository`, `ProjectRepository`, `MailRepository`, `EventRepository`, `TaskRepository`, `PersonRepository`, `HighlightRepository`, `PendingActionRepository`, `SyncStateRepository`), implemented with Drizzle.
+**`ProviderRegistry`** (application) maps a `ProviderKind` to its factory and caches one bundle per account. A factory
+may expose `fingerprint(account)`; when it changes the registry rebuilds the bundle. `GoogleProviderFactory`'s
+fingerprint is the stored token plus the user's **current** time zone, read from a live source, so a reconnect or a
+time-zone change in Settings is picked up by `worker` and `mcp-server` without a restart.
 
-### Registries and factories (the O in SOLID)
-
-```mermaid
-classDiagram
-  class ProviderRegistry {
-    +register(kind: ProviderKind, factory: ProviderFactory)
-    +forAccount(account: Account) ProviderBundle
-  }
-  class ProviderFactory {
-    <<interface>>
-    +create(account, credentials) ProviderBundle
-  }
-  class ProviderBundle {
-    mail?: MailReader & DraftWriter
-    calendar?: CalendarReader & EventWriter
-    tasks?: TaskReader & TaskWriter
-    identity: IdentityProvider
-    capabilities: ProviderCapabilities
-  }
-  class GoogleProviderFactory
-  class MicrosoftProviderFactory
-  ProviderFactory <|.. GoogleProviderFactory
-  ProviderFactory <|.. MicrosoftProviderFactory : future
-  ProviderRegistry o-- ProviderFactory
-  ProviderFactory ..> ProviderBundle
-
-  class TransportRegistry {
-    +register(kind: "local"|"ssh"|string, factory)
-    +forServer(server: Server) ProjectTransport
-  }
-  class AgentRegistry {
-    +register(kind, factory)
-    +default() AgentRunner
-  }
-```
-
-Provider differences are queried through **capabilities** (`ProviderCapabilities`: `threads`, `replyHeaders`, `sendAsAliases`, `taskLists`, `freeBusy`…), never with `instanceof`.
+**Settings** are layered (`LayeredSettings`): database > YAML > defaults. Every reader (`worker` tick, MCP tools,
+`api`) asks for the current value, so dashboard changes apply without restarts.
 
 ## 5. Key flows
 
-### 5.1 Syncing an account
+### 5.1 Reading data from the dashboard
+
+```mermaid
+sequenceDiagram
+  participant UI as web (TanStack Query)
+  participant API as api
+  participant MCP as mcp-server
+  participant UC as use case
+  participant DB as Postgres
+  UI->>API: GET /api/today
+  API->>MCP: get_daily_briefing (MCP client, bearer)
+  MCP->>UC: GetDailyBriefing.execute()
+  UC->>DB: events · priority emails · tasks due
+  UC-->>MCP: DailyBriefing (JSON)
+  MCP-->>API: tool result
+  API-->>UI: JSON
+```
+
+The dashboard never reads user data from the database directly: the same MCP tools an agent uses back every view, so
+the agent and the UI see the same thing. Write actions (draft, task, focus block) follow the same path with the
+corresponding tool. Only installation state (setup status, accounts, OAuth, preferences, agent token) uses
+application services directly in `api`.
+
+### 5.2 Syncing an account
 
 ```mermaid
 sequenceDiagram
   participant W as worker (SyncScheduler)
+  participant SR as SyncRequests
   participant UC as SyncAccount
   participant R as ProviderRegistry
-  participant P as GmailAdapter / Calendar / Tasks
+  participant P as Gmail / Calendar / Tasks
   participant DB as Repositories
-  W->>UC: execute(accountId)
-  UC->>DB: syncState(account, resource)
+  loop every 30 s (poll)
+    W->>W: re-schedule if sync.intervalMinutes changed
+    W->>SR: pending()
+    SR-->>W: [{accountId, requestedAt}]
+  end
+  W->>UC: execute(accountId)   (pending request or interval tick)
   UC->>R: forAccount(account)
   R-->>UC: ProviderBundle
   UC->>P: sync(cursor)
   P-->>UC: changes + new cursor
-  UC->>DB: upsert entities (+ raw JSONB)
-  UC->>UC: ThreadLinker / EventLinker (derived linking)
-  UC->>DB: store links + cursor
-  Note over UC,DB: if the cursor expires → bounded full resync (90 days)
+  UC->>DB: upsert entities (+ raw JSONB) and cursor
+  W->>SR: clear(accountId, requestedAt)
 ```
 
-### 5.2 Project discovery and snapshots
+- The interval comes from the settings; on start the worker catches up right away when the last sync is overdue.
+- A sync request is a timestamp on the account (`accounts.sync_requested_at`). `clear` is compare-and-clear: a request
+  made while the account was syncing stays pending.
+- Requests come from the *Sync now* button (`POST /api/sync` → `trigger_sync`) and from the OAuth callback right after
+  an account is connected (best effort), so the first sync starts without waiting for the interval.
+- When a cursor expires the sync falls back to a bounded full resync (90 days of mail by default).
 
-```mermaid
-sequenceDiagram
-  participant W as worker
-  participant D as DiscoverProjects
-  participant T as ProjectTransport (local|ssh)
-  participant DB as Repositories
-  participant Q as AiJobQueue
-  W->>D: execute(serverId)
-  D->>T: listClaudeProjects()
-  T-->>D: dirs in ~/.claude/projects
-  D->>T: stat(candidates) · gitRemote(path)
-  D->>DB: discovery_proposals (pending confirmation)
-  Note over W: confirmed projects
-  W->>T: readFile(registered documents) · gitLog(since)
-  W->>DB: document_snapshots (hash, mtime) · commits
-  alt some hash changed
-    W->>Q: enqueue RefreshHighlights(project) (2h debounce)
-  end
-```
+### 5.3 Connecting a Google account
 
-### 5.3 Chat with action approval
+`GET /api/oauth/google/start` → `ConnectAccount` creates the auth URL and keeps the state in memory (`oauth-pending`)
+→ Google → `GET /api/oauth/google/callback` checks the state, stores the token in `/data/tokens` (0600), creates or
+re-activates the account, requests a sync and redirects to the wizard or Settings with `?connected=` or `?error=`.
 
-```mermaid
-sequenceDiagram
-  participant UI as web
-  participant API as api
-  participant AR as ClaudeCodeRunner
-  participant CLI as claude -p
-  participant MCP as mcp-server
-  UI->>API: POST /chat {sessionId, message}
-  API->>AR: run({prompt, allowedTools: read-only + propose_action, resume})
-  AR->>CLI: spawn (stream-json, --mcp-config, --allowedTools)
-  CLI->>MCP: get_project_status / search_emails …
-  MCP-->>CLI: data
-  CLI->>MCP: propose_action(create_gmail_draft, params, rationale)
-  MCP-->>CLI: pending_action_id
-  CLI-->>AR: events (text, tool_use, result)
-  AR-->>API: AgentEvent stream
-  API-->>UI: SSE
-  UI->>API: POST /actions/{id}/approve
-  API->>MCP: create_gmail_draft(params)  (MCP client)
-  MCP-->>API: draftId
-  API-->>UI: confirmed
-```
+### 5.4 Verifying the Claude token
 
-### 5.4 Background AI queue
+`PUT /api/agent/token` rejects API-key-shaped values, stores the token in `/data/agent/claude-token` (0600), and
+`POST /api/agent/verify` runs `claude -p "Reply with OK" --output-format json` with only `PATH`, `HOME`, `TMPDIR` and
+the token in its environment. The result (ok + latency, or a capped failure message) is saved in `AgentStatusStore`.
 
-`AiJobQueue` (Postgres table + processor in `worker`): concurrency 1, per-key debounce (`highlights:<project>`), configurable daily cap, time window for meeting briefs (07:30) and catch-up of missed runs on startup. Each run records duration, reason and result.
+## 6. API and dashboard
 
-### 5.5 Task mirror
+### `/api` endpoints (`apps/api`)
 
-`TaskChange` in a list linked to a project → `MirrorTasks(project)` → Markdown render → `ProjectTransport.ensureGitExclude` + `writeJarvisFile(".jarvis/tasks.md")`.
+| Group | Endpoints |
+|---|---|
+| Setup | `GET /api/setup/status`, `GET /api/providers`, `GET /api/health` |
+| Google client | `GET`/`PUT /api/google/client` |
+| OAuth | `GET /api/oauth/:kind/start`, `GET /api/oauth/:kind/callback` |
+| Accounts | `GET /api/accounts`, `DELETE /api/accounts/:id?deleteData=`, `PUT /api/accounts/:id/calendars` |
+| Settings | `GET`/`PUT /api/settings` |
+| Agent | `PUT /api/agent/token`, `POST /api/agent/verify`, `POST /api/agent/skip` |
+| Today | `GET /api/today` |
+| Mail | `GET /api/mail/search`, `GET /api/mail/threads/:accountId/:threadId`, `POST /api/mail/drafts` |
+| Calendar | `GET /api/calendar/events`, `GET /api/calendar/calendars`, `POST /api/calendar/free-slot`, `POST /api/calendar/focus` |
+| Tasks | `GET /api/tasks`, `GET /api/tasks/lists`, `POST /api/tasks`, `POST /api/tasks/:accountId/:taskId/complete` |
+| Sync | `GET /api/sync`, `POST /api/sync` |
 
-## 6. Data model
+`LocalOnlyGuard` rejects any `Host`/`Origin` other than `127.0.0.1:3000`/`localhost:3000`, and every non-GET request
+must carry a JSON body (a CSRF defence: a cross-site form cannot send `application/json`).
+
+### Dashboard (`apps/web`)
+
+React 19 + Vite + React Router 7 + TanStack Query + Tailwind (shadcn-style components). Built into `api` and served
+from the same origin.
+
+| Route | What it shows |
+|---|---|
+| `/onboarding/{mail,agent,preferences,done}` | Wizard: Google client + connect, Claude token (optional), preferences, finish. `RequireSetup` sends you here until an account exists and preferences are saved. |
+| `/` (Today) | Agenda for the day with free slots and *Block focus*, priority emails, tasks due, free minutes. |
+| `/mail`, `/mail/:accountId/:threadId` | Search, thread view (external content rendered as untrusted text), reply as a **draft**. |
+| `/calendar` | Events, *Find free slot*, focus block with an account selector. |
+| `/tasks` | Lists and tasks per account, create and complete. |
+| `/settings/{accounts,agent,preferences}` | Connect, reconnect or remove accounts (optionally deleting their data), busy calendars, agent token, preferences. |
+
+The shell shows a sync indicator (*Sync now*) and a re-authorization banner for accounts whose token was revoked.
+Every action that touches more than one account asks which account to use instead of guessing.
+
+## 7. Data model
 
 ```mermaid
 erDiagram
-  ACCOUNT ||--o{ MAIL_THREAD : syncs
-  ACCOUNT ||--o{ CALENDAR : syncs
-  ACCOUNT ||--o{ TASK_LIST : syncs
-  ACCOUNT ||--o{ SYNC_STATE : has
-  MAIL_THREAD ||--o{ MAIL_MESSAGE : contains
-  CALENDAR ||--o{ EVENT : contains
-  TASK_LIST ||--o{ TASK : contains
-  TASK_LIST }o--o| PROJECT : "belongs to (0..1)"
-  SERVER ||--o{ PROJECT : hosts
-  SERVER ||--o{ DISCOVERY_PROPOSAL : produces
-  PROJECT ||--o{ PROJECT_DOCUMENT : registers
-  PROJECT_DOCUMENT ||--o{ DOCUMENT_SNAPSHOT : versions
-  PROJECT ||--o{ PROJECT_HIGHLIGHT : versions
-  PROJECT ||--o{ COMMIT : records
-  PERSON }o--o{ PROJECT : "PERSON_PROJECT"
-  MAIL_THREAD }o--o{ PROJECT : "THREAD_PROJECT (derived|suggested|manual)"
-  EVENT }o--o{ PROJECT : "EVENT_PROJECT (derived|manual)"
-  EVENT ||--o| MEETING_BRIEF : has
-  MAIL_MESSAGE }o--o{ PERSON : participants
-  EVENT }o--o{ PERSON : attendees
-  CHAT_SESSION ||--o{ PENDING_ACTION : proposes
-  AI_JOB }o--|| PROJECT : "about (optional)"
+  ACCOUNTS ||--o{ SYNC_STATE : has
+  ACCOUNTS ||--o{ MAIL_THREADS : syncs
+  MAIL_THREADS ||--o{ MAIL_MESSAGES : contains
+  ACCOUNTS ||--o{ CALENDARS : syncs
+  CALENDARS ||--o{ EVENTS : contains
+  ACCOUNTS ||--o{ TASK_LISTS : syncs
+  TASK_LISTS ||--o{ TASKS : contains
+  SETTINGS
 ```
 
-Conventions: internal UUID IDs; external IDs unique as `(account_id, external_id)`; a `raw jsonb` column with the provider's original response; `created_at`/`updated_at` everywhere; links store `origin` and `created_at` for historical analytics.
+Conventions: `accounts.id` is the account slug (e.g. `personal`), not a UUID; external IDs are unique as
+`(account_id, external_id)`; a `raw jsonb` column keeps the provider's original response; `settings` holds the single
+preferences document. Secrets (OAuth tokens, Google client, Claude token) live in files under `/data`, never in the
+database.
 
-## 7. Repository layout
+## 8. Repository layout
 
 ```
 jarvis/
 ├─ apps/
-│  ├─ api/            NestJS: chat, actions, registry, links, read-models modules
-│  ├─ mcp-server/     NestJS + MCP SDK: one provider per tool group
-│  ├─ worker/         NestJS + schedule: sync, discovery, snapshots, mirror, ai-queue
-│  └─ web/            React + Vite
+│  ├─ api/          NestJS: REST controllers, LocalOnlyGuard, MCP client, OAuth, e2e smoke server
+│  ├─ mcp-server/   NestJS + MCP SDK: tool groups (briefing, email, calendar, tasks, sync), bearer guard
+│  ├─ worker/       NestJS + schedule: SyncScheduler, catch-up, config import; CLI (`jarvis auth`)
+│  └─ web/          React + Vite dashboard and onboarding; Playwright e2e in `e2e/`
 ├─ packages/
-│  ├─ core/
-│  │  ├─ domain/       entities, value objects, services, ports
-│  │  └─ application/  use cases
-│  ├─ adapters-google/
-│  ├─ adapters-transport/   local, ssh
-│  ├─ adapters-agent/       claude-code
-│  ├─ adapters-persistence/ drizzle (schema, migrations, repositories)
-│  ├─ contracts/            per-port contract tests (reusable by adapters)
-│  └─ shared/               DTOs and Zod schemas (api ↔ web ↔ mcp)
-├─ agent/             agent instructions, skills and permissions (versioned)
-├─ remote/            jarvis-remote (SSH forced command) + installer
-├─ docker/            Dockerfiles
-├─ docs/              architecture, specs, plans
-├─ secrets/           (git-ignored) OAuth, tokens, keys
+│  ├─ core/                 domain (model, services, ports) and application (use cases, registry, views)
+│  ├─ adapters-google/      Gmail, Calendar, Tasks, OAuth, GoogleProviderFactory
+│  ├─ adapters-claude/      ClaudeCliRunner and agent credential/status stores
+│  ├─ adapters-persistence/ Drizzle schema, migrations, repositories
+│  ├─ composition/          Nest providers module, layered settings, paths, logger, Google client store
+│  ├─ config/               YAML + env loading and schema
+│  └─ contracts/            reusable per-port contract tests
+├─ docker/          Dockerfiles
+├─ docs/            architecture, pending work, specs, plans, spikes
+├─ tests/           repo-level tests (the `jarvis` script)
+├─ secrets/         (git-ignored) mcp_token, pg_password
+├─ jarvis           start/stop/status/logs script
 ├─ jarvis.config.example.yaml
 └─ docker-compose.yml
 ```
 
-## 8. Security (technical summary)
+## 9. Security (technical summary)
 
 | Risk | Mitigation |
 |---|---|
-| Unwanted email sending | There is no send port or tool; the `gmail.compose` scope is only used for drafts. |
-| Uncontrolled agent actions | In chat, only read tools + `propose_action`; the real execution is triggered by `api` after approval. |
-| Prompt injection from emails/documents | External content is delimited and marked as untrusted; the agent has no Bash or file editing. |
-| Arbitrary execution on servers | `SshTransport` only with named operations + `jarvis-remote` as forced command in `authorized_keys`. |
-| Improper writes to repos | Only `writeJarvisFile` under `.jarvis/`; excluded via `.git/info/exclude`; never commits. |
-| Secrets | Docker secrets from `secrets/` (git-ignored); OAuth tokens 0600; nothing sensitive in logs. |
-| Network exposure | Ports on `127.0.0.1`; MCP with bearer token. |
+| Unwanted email sending | No send port, tool or endpoint; the `gmail.compose` scope is only used for drafts. |
+| API-key billing | Only a subscription token from `claude setup-token` is accepted; API-key-shaped values are rejected. |
+| Cross-site requests to the local dashboard | `LocalOnlyGuard` (Host/Origin allow-list) + JSON-only bodies on writes. |
+| Prompt injection / XSS from emails | External content is delimited and marked untrusted in MCP output; the dashboard renders it as text. |
+| Secrets | Docker secrets from `secrets/` (git-ignored); files under `/data` mode `0600`; tokens never logged; CLI failure text capped at 500 characters. |
+| Network exposure | Ports on `127.0.0.1` only; MCP requires a bearer token. |
 
-## 9. How to extend
+## 10. Planned (not built yet)
 
-**New provider (e.g. Microsoft 365)**
-1. Create `packages/adapters-microsoft` with classes that implement the needed ports (`MailReader`, `DraftWriter`, …) and declare their `capabilities()`.
-2. Implement `MicrosoftProviderFactory` and `MicrosoftOAuthFlow`.
-3. Make the `packages/contracts` suite pass for each port.
-4. Register the factory in `ProviderRegistry` (providers Nest module). Domain and use cases do not change.
+These parts of the original design are not implemented; see [`PENDING.md`](PENDING.md) for the backlog.
 
-**New transport** (e.g. a remote agent over HTTP): implement `ProjectTransport`, pass the contracts, register it in `TransportRegistry`, add the `kind` to the config schema.
-
-**New agent**: implement `AgentRunner` (`AgentEvent` streaming, sessions, allowed MCP tools) and register it in `AgentRegistry`. `AgentSummarizer` works on top of any `AgentRunner`.
+- **Phase 3: agent chat.** A chat panel in the dashboard backed by `claude -p` streaming (SSE), with read-only MCP
+  tools plus `propose_action`; actions run only after the user approves them in the UI (`PendingAction`).
+- **Phase 2: projects.** `ProjectTransport` (local volumes and restricted SSH with a `jarvis-remote` forced command),
+  project discovery from `~/.claude/projects`, document snapshots and commits, AI highlights through a background
+  queue, linking of threads/events/people to projects, and a task mirror written to `.jarvis/tasks.md`.
+- **More providers**, e.g. Microsoft 365: a new `adapters-*` package implementing the same ports and a
+  `ProviderFactory`, passing the `contracts` suite and registered in `ProvidersModule`. Domain and use cases do not
+  change.
+- **Analytics** over the synced history.
