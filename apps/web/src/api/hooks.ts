@@ -26,3 +26,13 @@ export function useTriggerSync() {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.sync }),
   });
 }
+
+/** Query keys of the dashboard data views. */
+export const dataKeys = {
+  today: ['today'] as const,
+  mail: (f: object) => ['mail', f] as const,
+  thread: (a: string, t: string) => ['thread', a, t] as const,
+  events: (from: string, to: string) => ['events', from, to] as const,
+  tasks: (status: string) => ['tasks', status] as const,
+  taskLists: ['task-lists'] as const,
+};

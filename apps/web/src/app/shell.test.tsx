@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Account, SetupStatus } from '@/api/client';
+import { emptyToday } from '@/test/fixtures';
 import { server } from '@/test/server';
 import { App } from './app';
 import { createTestRouter } from './router';
@@ -15,6 +16,8 @@ const account = (over: Partial<Account>): Account => ({
 function mockApi(opts: { setup?: SetupStatus; accounts?: Account[]; lastSyncAt?: string | null } = {}) {
   const posts: { contentType: string | null; body: unknown }[] = [];
   server.use(
+    http.get('/api/today', () => HttpResponse.json(emptyToday)),
+    http.get('/api/settings', () => HttpResponse.json({ zone: 'UTC', workSchedule: { startHour: 9, endHour: 19, workDays: [1] } })),
     http.get('/api/setup/status', () => HttpResponse.json(opts.setup ?? ready)),
     http.get('/api/providers', () => HttpResponse.json([{ kind: 'google', label: 'Google' }])),
     http.get('/api/accounts', () => HttpResponse.json(opts.accounts ?? [account({})])),
@@ -48,7 +51,7 @@ describe('app shell', () => {
     expect(await screen.findByRole('heading', { name: 'Set up Jarvis' })).toBeInTheDocument();
   });
 
-  it('renders the nav and the Today placeholder once set up', async () => {
+  it('renders the nav and the Today view once set up', async () => {
     mockApi();
     renderAt('/');
     expect(await screen.findByRole('heading', { name: 'Today' })).toBeInTheDocument();

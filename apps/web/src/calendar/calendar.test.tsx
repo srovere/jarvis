@@ -1,0 +1,99 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { App } from '@/app/app';
+import { createTestRouter } from '@/app/router';
+import { jsonBody, mockShell } from '@/test/fixtures';
+import { server } from '@/test/server';
+
+beforeEach(() => vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-25T12:00:00Z') })); // a Wednesday
+afterEach(() => vi.useRealTimers());
+
+const renderAt = () => render(<App router={createTestRouter(['/calendar'])} />);
+
+function mockEvents() {
+  const queries: { from: string | null; to: string | null }[] = [];
+  server.use(
+    http.get('/api/calendar/events', ({ request }) => {
+      const u = new URL(request.url);
+      queries.push({ from: u.searchParams.get('from'), to: u.searchParams.get('to') });
+      return HttpResponse.json({
+        events: [{ id: 'e1', title: '<external_content source="calendar">Planning</external_content>', start: '2026-11-24T10:00:00.000+00:00', end: '2026-11-24T11:00:00.000+00:00', allDay: false, attendees: [] }],
+      });
+    }),
+  );
+  return queries;
+}
+
+describe('Calendar week', () => {
+  it('requests Monday to the next Monday (exclusive) and navigates weeks', async () => {
+    mockShell();
+    const queries = mockEvents();
+    renderAt();
+    expect(await screen.findByText('Planning')).toBeInTheDocument();
+    expect(queries.at(-1)).toEqual({ from: '2026-11-23', to: '2026-11-30' });
+    await userEvent.click(screen.getByRole('button', { name: 'Next week' }));
+    await vi.waitFor(() => expect(queries.at(-1)).toEqual({ from: '2026-11-30', to: '2026-12-07' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Previous week' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Previous week' }));
+    await vi.waitFor(() => expect(queries.at(-1)).toEqual({ from: '2026-11-16', to: '2026-11-23' }));
+    await userEvent.click(screen.getByRole('button', { name: 'This week' }));
+    await vi.waitFor(() => expect(queries.at(-1)).toEqual({ from: '2026-11-23', to: '2026-11-30' }));
+  });
+
+  it('uses the configured time zone to decide which week is current', async () => {
+    // 2026-11-29 23:30 UTC is already Monday 2026-11-30 in Auckland.
+    vi.setSystemTime(new Date('2026-11-29T23:30:00Z'));
+    mockShell();
+    server.use(http.get('/api/settings', () => HttpResponse.json({ zone: 'Pacific/Auckland', workSchedule: { startHour: 9, endHour: 19, workDays: [1] }, focus: { titlePrefix: '', horizonWorkDays: 5, defaultDurationMinutes: 90 }, sync: { intervalMinutes: 5, gmailInitialWindowDays: 90 }, briefing: { maxPriorityEmails: 10 } })));
+    const queries = mockEvents();
+    renderAt();
+    await vi.waitFor(() => expect(queries.at(-1)).toEqual({ from: '2026-11-30', to: '2026-12-07' }));
+  });
+});
+
+describe('Calendar actions', () => {
+  it('finds a free slot and just shows it', async () => {
+    mockShell();
+    mockEvents();
+    let body: unknown;
+    server.use(
+      http.post('/api/calendar/free-slot', async ({ request }) => {
+        body = await jsonBody(request);
+        return HttpResponse.json({ slot: { start: '2026-11-26T09:00:00.000+00:00', end: '2026-11-26T10:30:00.000+00:00' } });
+      }),
+    );
+    renderAt();
+    await userEvent.click(await screen.findByRole('button', { name: 'Find free slot' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Find' }));
+    expect(await within(dialog).findByText('2026-11-26 09:00–10:30')).toBeInTheDocument();
+    expect(body).toEqual({ durationMinutes: 90 });
+  });
+
+  it('blocks focus time only after the user confirms the proposed slot', async () => {
+    mockShell();
+    mockEvents();
+    const posts: unknown[] = [];
+    server.use(
+      http.post('/api/calendar/free-slot', () => HttpResponse.json({ slot: { start: '2026-11-26T09:00:00.000+00:00', end: '2026-11-26T10:00:00.000+00:00' } })),
+      http.post('/api/calendar/focus', async ({ request }) => {
+        posts.push(await jsonBody(request));
+        return HttpResponse.json({ status: 'created', start: '2026-11-26T09:00:00.000+00:00', end: '2026-11-26T10:00:00.000+00:00' });
+      }),
+    );
+    renderAt();
+    await userEvent.click(await screen.findByRole('button', { name: 'Block focus time' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Write report');
+    await userEvent.clear(within(dialog).getByLabelText('Duration (minutes)'));
+    await userEvent.type(within(dialog).getByLabelText('Duration (minutes)'), '60');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Find a slot' }));
+    expect(await within(dialog).findByText('2026-11-26 09:00–10:00')).toBeInTheDocument();
+    expect(posts).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm and block' }));
+    expect(await within(dialog).findByText(/Focus time blocked/)).toBeInTheDocument();
+    expect(posts).toEqual([{ taskName: 'Write report', durationMinutes: 60 }]);
+  });
+});

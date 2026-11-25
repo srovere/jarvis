@@ -1,8 +1,13 @@
 import { createBrowserRouter, createMemoryRouter, Navigate, Outlet, type RouteObject } from 'react-router-dom';
 import { useSetupStatus } from '@/api/hooks';
 import { Button } from '@/components/ui/button';
+import { CalendarPage } from '@/calendar/calendar-page';
+import { MailPage } from '@/mail/mail-page';
+import { ThreadPage } from '@/mail/thread-page';
 import { onboardingRoutes } from '@/onboarding/wizard';
 import { Placeholder } from '@/pages/placeholder';
+import { TasksPage } from '@/tasks/tasks-page';
+import { TodayPage } from '@/today/today-page';
 import { Shell } from './shell';
 
 /** Sends the user to /onboarding until an account exists and preferences are saved. */
@@ -30,11 +35,11 @@ export const routes: RouteObject[] = [
       {
         element: <Shell />,
         children: [
-          { path: '/', element: <Placeholder title="Today" /> },
-          { path: '/mail', element: <Placeholder title="Mail" /> },
-          { path: '/mail/:accountId/:threadId', element: <Placeholder title="Thread" /> },
-          { path: '/calendar', element: <Placeholder title="Calendar" /> },
-          { path: '/tasks', element: <Placeholder title="Tasks" /> },
+          { path: '/', element: <TodayPage /> },
+          { path: '/mail', element: <MailPage /> },
+          { path: '/mail/:accountId/:threadId', element: <ThreadPage /> },
+          { path: '/calendar', element: <CalendarPage /> },
+          { path: '/tasks', element: <TasksPage /> },
           { path: '/settings/*', element: <Placeholder title="Settings" /> },
         ],
       },

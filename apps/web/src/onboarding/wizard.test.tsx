@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { App } from '@/app/app';
 import { createTestRouter } from '@/app/router';
-import { account, defaultPreferences, fresh, mockOnboarding, ready } from '@/test/fixtures';
+import { account, defaultPreferences, emptyToday, fresh, mockOnboarding, ready } from '@/test/fixtures';
 import { server } from '@/test/server';
 
 const renderAt = (path: string) => render(<App router={createTestRouter([path])} />);
@@ -31,7 +31,11 @@ describe('onboarding wizard routing', () => {
 
   it('redirects to the dashboard when setup is complete', async () => {
     mockOnboarding({ setup: ready, accounts: [account()] });
-    server.use(http.get('/api/sync', () => HttpResponse.json({ accounts: [] })));
+    server.use(
+      http.get('/api/sync', () => HttpResponse.json({ accounts: [] })),
+      http.get('/api/settings', () => HttpResponse.json(defaultPreferences)),
+      http.get('/api/today', () => HttpResponse.json(emptyToday)),
+    );
     renderAt('/onboarding');
     expect(await screen.findByRole('heading', { name: 'Today' })).toBeInTheDocument();
   });
