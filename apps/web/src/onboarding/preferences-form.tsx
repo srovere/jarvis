@@ -62,12 +62,16 @@ function BusyCalendars({
   const toggle = (id: string, on: boolean) => onChange(on ? [...value, id] : value.filter((v) => v !== id));
 
   if (!fallback) {
+    // Only ids the list shows are kept: a hidden one (e.g. a stale default) would be synced without the user seeing it.
+    const listed = new Set(mine.map((c) => c.id));
+    const toggleListed = (id: string, on: boolean) =>
+      onChange((on ? [...value, id] : value.filter((v) => v !== id)).filter((v) => listed.has(v)));
     return (
       <fieldset className="space-y-1">
         <legend className="text-sm text-neutral-600">{account.email}</legend>
         {mine.map((c) => (
           <label key={c.id} className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={value.includes(c.id)} onChange={(e) => toggle(c.id, e.target.checked)} />
+            <input type="checkbox" checked={value.includes(c.id)} onChange={(e) => toggleListed(c.id, e.target.checked)} />
             {plainText(c.title)}
           </label>
         ))}

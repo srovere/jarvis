@@ -151,6 +151,14 @@ describe('GoogleCalendarAdapter sync', () => {
     expect((await adapter.sync('primary', next.nextCursor)).changes).toEqual([]);
   });
 
+  it("lists the primary calendar as 'primary', never under its real id", async () => {
+    const { adapter } = setup({ calendars: ['me@gmail.com', 'team@group.calendar.google.com'] });
+    expect(await adapter.listCalendars()).toEqual([
+      { id: 'primary', title: 'me@gmail.com', primary: true },
+      { id: 'team@group.calendar.google.com', title: 'team@group.calendar.google.com', primary: false },
+    ]);
+  });
+
   it('translates invalid_grant to ReauthRequired', async () => {
     const { fake, adapter } = setup();
     fake.calls.calendarListList.mockImplementationOnce(() => {

@@ -75,6 +75,17 @@ describe('preferences step', () => {
     expect(saved.calendars).toEqual([{ id: 'a1', body: { ids: ['primary', 'work@example.com'] } }]);
   });
 
+  it('drops a stored calendar id the list does not show once the user changes the selection', async () => {
+    const saved = mockPrefs(
+      [cal({}), cal({ id: 'work@example.com', title: 'Work', primary: false, busy: false })],
+      [account({ busyCalendars: ['primary', 'me@example.com'] })],
+    );
+    renderAt('/onboarding/preferences');
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Work' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finish setup' }));
+    await waitFor(() => expect(saved.calendars).toEqual([{ id: 'a1', body: { ids: ['primary', 'work@example.com'] } }]));
+  });
+
   it('blocks submit with a message when start is not before end', async () => {
     const saved = mockPrefs([cal({})]);
     renderAt('/onboarding/preferences');

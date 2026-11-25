@@ -12,6 +12,9 @@ import { CalendarMapper } from './calendar-mapper';
 const INITIAL_WINDOW_DAYS = 30;
 const PAGE_SIZE = 250;
 
+/** Google's alias for the user's primary calendar. */
+const PRIMARY = 'primary';
+
 /** Google Calendar as `CalendarReader` and `EventWriter`. */
 export class GoogleCalendarAdapter implements CalendarReader, EventWriter {
   private readonly mapper: CalendarMapper;
@@ -32,7 +35,11 @@ export class GoogleCalendarAdapter implements CalendarReader, EventWriter {
       const token = pageToken;
       const page = await this.call(() => this.cal.calendarList.list({ maxResults: PAGE_SIZE, pageToken: token }));
       for (const c of page.items ?? []) {
-        if (c.id) out.push({ id: c.id, title: c.summaryOverride ?? c.summary ?? c.id, primary: c.primary === true });
+        if (!c.id) continue;
+        // The primary calendar is always reported as 'primary' (the alias Jarvis stores and syncs by default):
+        // under its real id (the account's email) it would be stored and synced a second time.
+        const primary = c.primary === true;
+        out.push({ id: primary ? PRIMARY : c.id, title: c.summaryOverride ?? c.summary ?? c.id, primary });
       }
       pageToken = page.nextPageToken ?? undefined;
     } while (pageToken);
