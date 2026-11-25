@@ -81,16 +81,18 @@ export class TasksTools implements ToolGroup {
           notes: z.string().optional().describe('Optional details.'),
           due: z.iso.date().optional().describe('Due date, YYYY-MM-DD.'),
           account_id: z.string().min(1).optional().describe('Account to create it in (active); default the first active account.'),
+          list_id: z.string().min(1).optional().describe('Task list of that account (see list_task_lists); default its default list.'),
         },
         outputSchema: briefingTaskSchema.shape,
       },
-      ({ title, notes, due, account_id }) =>
+      ({ title, notes, due, account_id, list_id }) =>
         this.runner.run('create_task', async () => {
           const task = await this.create.execute({
             title,
             ...(notes !== undefined ? { notes } : {}),
             ...(due !== undefined ? { due } : {}),
             ...(account_id !== undefined ? { accountId: account_id } : {}),
+            ...(list_id !== undefined ? { listId: list_id } : {}),
           });
           return { text: `Task created:\n${taskLine(task)}`, structured: task };
         }),

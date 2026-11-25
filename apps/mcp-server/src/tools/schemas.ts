@@ -16,6 +16,7 @@ export const briefingEventSchema = z.object({
 
 export const briefingEmailSchema = z.object({
   threadId: z.string(),
+  accountId: z.string().describe('Account that owns the thread'),
   from: z.string().describe('Untrusted sender wrapped in <external_content source="email">'),
   subject: z.string().describe('Untrusted subject wrapped in <external_content source="email">'),
   date: z.string(),
@@ -24,6 +25,7 @@ export const briefingEmailSchema = z.object({
 
 export const briefingTaskSchema = z.object({
   id: z.string(),
+  accountId: z.string().describe('Account that owns the task'),
   title: z.string(),
   due: z.string().optional(),
   list: z.string(),

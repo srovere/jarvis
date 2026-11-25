@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useToday } from '@/api/data-hooks';
 import type { EventItem } from '@/api/data';
 import { plainText } from '@/api/external-content';
-import { useAccounts, useSettings } from '@/api/hooks';
+import { useSettings } from '@/api/hooks';
 import { QueryState } from '@/components/query-state';
 import { Card } from '@/components/ui/card';
 import { clock, fmtMinutes } from '@/lib/dates';
@@ -19,10 +19,21 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 }
 
 const minutesOfDay = (iso: string) => +iso.slice(11, 13) * 60 + +iso.slice(14, 16);
+/** Minutes since midnight in `zone` (the browser's zone when absent or invalid). */
+function nowMinutes(zone?: string): number {
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  } catch {
+    parts = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  }
+  const n = (t: string) => +(parts.find((p) => p.type === t)?.value ?? 0);
+  return n('hour') * 60 + n('minute');
+}
 const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
 /** Gaps of at least 30 minutes between timed events inside the work hours (event times are in the configured zone). */
-function freeGaps(events: EventItem[], startHour: number, endHour: number): { start: number; end: number }[] {
+export function freeGaps(events: EventItem[], startHour: number, endHour: number, nowMin = 0): { start: number; end: number }[] {
   const busy = events
     .filter((e) => !e.allDay)
     .map((e) => ({ start: minutesOfDay(e.start), end: minutesOfDay(e.end) }))
@@ -34,15 +45,13 @@ function freeGaps(events: EventItem[], startHour: number, endHour: number): { st
     cursor = Math.max(cursor, b.end);
   }
   if (endHour * 60 - cursor >= 30) gaps.push({ start: cursor, end: endHour * 60 });
-  return gaps.filter((g) => g.end > g.start);
+  // Past gaps are dropped and the one in progress starts now.
+  return gaps.map((g) => ({ start: Math.max(g.start, nowMin), end: g.end })).filter((g) => g.end - g.start >= 15);
 }
 
 export function TodayPage() {
   const query = useToday();
   const settings = useSettings();
-  const accounts = useAccounts();
-  // Briefing emails do not say which account owns the thread: use the first active account (see report).
-  const accountId = (accounts.data ?? []).find((a) => a.status === 'active')?.id ?? '';
   const work = settings.data?.workSchedule;
 
   return (
@@ -70,7 +79,7 @@ export function TodayPage() {
                     </li>
                   ))}
                   {work &&
-                    freeGaps(t.events, work.startHour, work.endHour).map((g) => (
+                    freeGaps(t.events, work.startHour, work.endHour, nowMinutes(settings.data?.zone)).map((g) => (
                       <li key={`free-${g.start}`} className="text-neutral-500">
                         Free {hhmm(g.start)}–{hhmm(g.end)}
                       </li>
@@ -83,7 +92,7 @@ export function TodayPage() {
                   {t.emails.length === 0 && <li className="text-neutral-500">No priority emails.</li>}
                   {t.emails.map((m) => (
                     <li key={m.threadId}>
-                      <Link className="block hover:underline" to={`/mail/${encodeURIComponent(accountId)}/${encodeURIComponent(m.threadId)}`}>
+                      <Link className="block hover:underline" to={`/mail/${encodeURIComponent(m.accountId)}/${encodeURIComponent(m.threadId)}`}>
                         <span className="font-medium">{plainText(m.subject)}</span>
                         <span className="block text-neutral-500">{plainText(m.from)}</span>
                       </Link>

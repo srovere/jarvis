@@ -11,11 +11,17 @@ beforeEach(() => vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-25T
 afterEach(() => vi.useRealTimers());
 
 const open = [
-  { id: 'k1', title: 'Old thing', due: '2026-11-20', list: 'My Tasks' },
-  { id: 'k2', title: 'Today thing', due: '2026-11-25', list: 'My Tasks' },
-  { id: 'k3', title: 'Someday', list: 'My Tasks' },
+  { id: 'k1', accountId: 'a1', title: 'Old thing', due: '2026-11-20', list: 'My Tasks' },
+  { id: 'k2', accountId: 'a1', title: 'Today thing', due: '2026-11-25', list: 'My Tasks' },
+  { id: 'k3', accountId: 'a1', title: 'Someday', list: 'My Tasks' },
 ];
-const lists = { lists: [{ accountId: 'a1', id: 'l1', title: '<external_content source="tasks">My Tasks</external_content>' }] };
+const lists = {
+  lists: [
+    { accountId: 'a1', id: 'l1', title: '<external_content source="tasks">My Tasks</external_content>' },
+    { accountId: 'a1', id: 'l2', title: '<external_content source="tasks">Home</external_content>' },
+    { accountId: 'a2', id: 'l9', title: '<external_content source="tasks">Work</external_content>' },
+  ],
+};
 const renderAt = () => render(<App router={createTestRouter(['/tasks'])} />);
 
 function mockTasks(accounts = [account()]) {
@@ -26,7 +32,7 @@ function mockTasks(accounts = [account()]) {
     http.get('/api/tasks', ({ request }) => {
       const s = new URL(request.url).searchParams.get('status');
       statuses.push(s);
-      return HttpResponse.json({ tasks: s === 'completed' ? [{ id: 'k9', title: 'Done thing', list: 'My Tasks' }] : open });
+      return HttpResponse.json({ tasks: s === 'completed' ? [{ id: 'k9', accountId: 'a1', title: 'Done thing', list: 'My Tasks' }] : open });
     }),
   );
   return statuses;
@@ -49,8 +55,9 @@ describe('Tasks filters', () => {
 });
 
 describe('Complete task', () => {
-  it('completes optimistically with the owning account', async () => {
+  it('completes optimistically with the account of the task', async () => {
     mockTasks();
+    server.use(http.get('/api/tasks', () => HttpResponse.json({ tasks: [{ id: 'k2', accountId: 'a2', title: 'Today thing', due: '2026-11-25', list: 'Work' }] })));
     let url = '';
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
@@ -65,7 +72,7 @@ describe('Complete task', () => {
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Complete Today thing' }));
     await waitFor(() => expect(screen.queryByText('Today thing')).not.toBeInTheDocument()); // gone before the server answers
     release();
-    await waitFor(() => expect(url).toBe('/api/tasks/a1/k2/complete'));
+    await waitFor(() => expect(url).toBe('/api/tasks/a2/k2/complete'));
   });
 
   it('rolls back and shows the error when completing fails', async () => {
@@ -91,6 +98,21 @@ describe('Create task and account selector', () => {
     await userEvent.type(within(dialog).getByLabelText('Due date'), '2026-12-01');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(body).toEqual({ title: 'Buy milk', due: '2026-12-01' }));
+  });
+
+  it('offers the lists of the selected account and sends the chosen list', async () => {
+    mockTasks([account(), account({ id: 'a2', email: 'b@example.com' })]);
+    let body: unknown;
+    server.use(http.post('/api/tasks', async ({ request }) => ((body = await jsonBody(request)), HttpResponse.json({ id: 'n', accountId: 'a1', title: 'X', list: 'Home' }))));
+    renderAt();
+    await userEvent.click(await screen.findByRole('button', { name: 'New task' }));
+    const dialog = await screen.findByRole('dialog');
+    const list = await within(dialog).findByRole('combobox', { name: 'List' });
+    await waitFor(() => expect(within(list).getAllByRole('option').map((o) => o.textContent)).toEqual(['Default list', 'My Tasks', 'Home']));
+    await userEvent.selectOptions(list, 'l2');
+    await userEvent.type(within(dialog).getByLabelText('Title'), 'X');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(body).toEqual({ title: 'X', listId: 'l2' }));
   });
 
   it('shows the account selector with two active accounts and sends the choice', async () => {

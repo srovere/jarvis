@@ -17,7 +17,7 @@ describe('ListTasks', () => {
   });
 
   it('defaults to open tasks with list title and zoned due', async () => {
-    expect(await useCase().execute({})).toEqual([{ id: 'open', title: 'Task open', due: '2026-11-24T00:00:00.000-03:00', list: 'Inbox' }]);
+    expect(await useCase().execute({})).toEqual([{ id: 'open', accountId: 'a1', title: 'Task open', due: '2026-11-24T00:00:00.000-03:00', list: 'Inbox' }]);
   });
 
   it('completed returns only completed tasks; all returns both', async () => {

@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { completeTask, type TaskItem } from '@/api/data';
-import { useTaskLists, useTasks } from '@/api/data-hooks';
+import { useTasks } from '@/api/data-hooks';
 import { plainText } from '@/api/external-content';
-import { useAccounts, useSettings } from '@/api/hooks';
+import { useSettings } from '@/api/hooks';
 import { QueryState } from '@/components/query-state';
 import { Button } from '@/components/ui/button';
 import { todayIn } from '@/lib/dates';
@@ -22,19 +22,12 @@ export function TasksPage() {
   const [filter, setFilter] = useState<Filter>('open');
   const [creating, setCreating] = useState(false);
   const settings = useSettings();
-  const accounts = useAccounts();
-  const lists = useTaskLists();
   // The API only knows open/completed/all: overdue = open tasks due before today, decided here.
   const tasks = useTasks(filter === 'completed' ? 'completed' : 'open');
   const today = todayIn(settings.data?.zone);
-  const firstActive = (accounts.data ?? []).find((a) => a.status === 'active')?.id;
-
-  // Task views carry only the list title; its account comes from the task lists (default: first active account).
-  const accountOf = (t: TaskItem) =>
-    lists.data?.lists.find((l) => plainText(l.title) === plainText(t.list))?.accountId ?? firstActive ?? '';
 
   const complete = useMutation({
-    mutationFn: (t: TaskItem) => completeTask(accountOf(t), t.id),
+    mutationFn: (t: TaskItem) => completeTask(t.accountId, t.id),
     onMutate: async (t) => {
       await qc.cancelQueries({ queryKey: ['tasks'] });
       const snapshot = qc.getQueriesData<{ tasks: TaskItem[] }>({ queryKey: ['tasks'] });

@@ -17,6 +17,8 @@ export interface BriefingEvent {
 
 export interface BriefingEmail {
   threadId: string;
+  /** Account that owns the thread. */
+  accountId: string;
   from: string;
   subject: string;
   date: string;
@@ -26,6 +28,8 @@ export interface BriefingEmail {
 
 export interface BriefingTask {
   id: string;
+  /** Account that owns the task. */
+  accountId: string;
   title: string;
   due?: string;
   list: string;
@@ -89,6 +93,7 @@ export function toBriefingTasks(tasks: Task[], lists: TaskList[], zone: string):
   const titles = new Map(lists.map((l) => [`${l.accountId}|${l.id}`, l.title]));
   return tasks.map((t) => ({
     id: t.id,
+    accountId: t.accountId,
     title: t.title,
     ...(t.due ? { due: isoIn(t.due, zone) } : {}),
     list: titles.get(`${t.accountId}|${t.listId}`) ?? t.listId,

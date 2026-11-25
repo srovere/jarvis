@@ -160,7 +160,7 @@ export class CalendarController {
 }
 
 const TasksQuery = z.object({ status: z.enum(['open', 'completed', 'all']).optional() });
-const CreateTaskBody = z.object({ title: z.string().trim().min(1), notes: z.string().optional(), due: z.iso.date().optional(), accountId: id.optional() });
+const CreateTaskBody = z.object({ title: z.string().trim().min(1), notes: z.string().optional(), due: z.iso.date().optional(), accountId: id.optional(), listId: id.optional() });
 
 @Controller('api/tasks')
 export class TasksController {
@@ -183,7 +183,7 @@ export class TasksController {
   @Post()
   create(@Body() body: unknown) {
     const b = parse(CreateTaskBody, body);
-    return this.mcp.call('create_task', defined({ title: b.title, notes: b.notes, due: b.due, account_id: b.accountId }));
+    return this.mcp.call('create_task', defined({ title: b.title, notes: b.notes, due: b.due, account_id: b.accountId, list_id: b.listId }));
   }
 
   /** `complete_task` in the account that owns the task. */

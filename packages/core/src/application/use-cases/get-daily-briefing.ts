@@ -103,6 +103,7 @@ export class GetDailyBriefing {
     const ranked = await this.priority.rank(candidates, own, settings.briefing.maxPriorityEmails);
     return ranked.map((t) => ({
       threadId: t.id,
+      accountId: t.accountId,
       from: t.lastFrom.toString(),
       subject: t.subject,
       date: isoIn(t.lastMessageAt, settings.zone),

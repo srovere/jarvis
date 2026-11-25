@@ -18,7 +18,7 @@ describe('CreateTask', () => {
 
   it('creates in the default list with the due date at start of day in the zone, and stores it', async () => {
     const r = await uc.execute({ title: 'Pay', notes: 'n', due: '2026-11-24' });
-    expect(r).toEqual({ id: 'task-1', title: 'Pay', due: '2026-11-24T00:00:00.000-03:00', list: 'Mine' });
+    expect(r).toEqual({ id: 'task-1', accountId: 'a1', title: 'Pay', due: '2026-11-24T00:00:00.000-03:00', list: 'Mine' });
     const stored = await f.repos.tasks.open({ accountIds: ['a1'] });
     expect(stored).toHaveLength(1);
     expect(stored[0]!.listId).toBe('l2');
@@ -28,7 +28,12 @@ describe('CreateTask', () => {
 
   it('uses an explicit list and omits due when absent', async () => {
     const r = await uc.execute({ title: 'T', listId: 'l1' });
-    expect(r).toEqual({ id: 'task-1', title: 'T', list: 'Other' });
+    expect(r).toEqual({ id: 'task-1', accountId: 'a1', title: 'T', list: 'Other' });
+  });
+
+  it('rejects a list id the account does not have, creating nothing', async () => {
+    await expect(uc.execute({ title: 'T', listId: 'nope' })).rejects.toThrow('Account a1 has no task list nope');
+    expect(await f.repos.tasks.open({ accountIds: ['a1'] })).toHaveLength(0);
   });
 
   it('rejects malformed dates', async () => {

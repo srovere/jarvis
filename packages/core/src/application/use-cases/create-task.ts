@@ -26,6 +26,7 @@ export class CreateTask {
     if (!bundle.tasks) throw new DomainError(`Account ${account.id} does not support tasks`);
 
     const lists = await this.knownLists(account, bundle, q.listId);
+    if (q.listId !== undefined && !lists.some((l) => l.id === q.listId)) throw new DomainError(`Account ${account.id} has no task list ${q.listId}`);
     const listId = q.listId ?? lists.find((l) => l.isDefault)?.id;
     if (!listId) throw new DomainError(`Account ${account.id} has no default task list`);
     const task = await bundle.tasks.createTask(listId, {

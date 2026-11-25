@@ -357,6 +357,13 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
       expect(r.json.list).toBe('Work tasks');
     });
 
+    it('passes the chosen list through to create_task', async () => {
+      const r = await send(port, 'POST', '/api/tasks', { title: 'Listed', accountId: 'work', listId: 'wl' });
+      expect(r.status).toBe(201);
+      expect(calls[0]).toEqual(['create_task', { title: 'Listed', account_id: 'work', list_id: 'wl' }]);
+      expect((await send(port, 'POST', '/api/tasks', { title: 'x', listId: '' })).status).toBe(400);
+    });
+
     it('completes a task of the second account', async () => {
       const r = await send(port, 'POST', '/api/tasks/work/wk1/complete', {});
       expect(r.status).toBe(200);

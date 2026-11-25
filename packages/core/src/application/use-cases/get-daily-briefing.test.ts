@@ -67,6 +67,7 @@ describe('GetDailyBriefing', () => {
     expect(b.priorityEmails).toHaveLength(10);
     expect(b.priorityEmails[0]).toEqual({
       threadId: 't0',
+      accountId: 'a1',
       from: 'Ana <ana@client.com>',
       subject: 'Subject t0',
       date: '2026-11-23T19:00:00.000-03:00',
@@ -91,7 +92,7 @@ describe('GetDailyBriefing', () => {
       { kind: 'upsert', task: task('no-due', 'a1') },
     ]);
     const b = await useCase().execute({ dateOffsetDays: 1 });
-    expect(b.tasksDue).toEqual([{ id: 'due-tue', title: 'Task due-tue', due: '2026-11-24T15:00:00.000-03:00', list: 'Inbox' }]);
+    expect(b.tasksDue).toEqual([{ id: 'due-tue', accountId: 'a1', title: 'Task due-tue', due: '2026-11-24T15:00:00.000-03:00', list: 'Inbox' }]);
   });
 
   it('lists accounts needing re-auth and leaves their data out', async () => {

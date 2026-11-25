@@ -19,6 +19,7 @@ export interface EventItem {
 
 export interface EmailItem {
   threadId: string;
+  accountId: string;
   from: string;
   subject: string;
   date: string;
@@ -27,6 +28,7 @@ export interface EmailItem {
 
 export interface TaskItem {
   id: string;
+  accountId: string;
   title: string;
   due?: string;
   /** Title of the task list. */
@@ -122,7 +124,7 @@ export const blockFocus = (taskName: string, durationMinutes: number) =>
 
 export const getTasks = (status: TaskStatus) => api<{ tasks: TaskItem[] }>(`/api/tasks?status=${status}`);
 export const getTaskLists = () => api<{ lists: TaskList[] }>('/api/tasks/lists');
-export const createTask = (task: { title: string; due?: string; accountId?: string }) =>
+export const createTask = (task: { title: string; due?: string; accountId?: string; listId?: string }) =>
   api<TaskItem>('/api/tasks', { method: 'POST', body: task });
 export const completeTask = (accountId: string, taskId: string) =>
   api<TaskItem>(`/api/tasks/${encodeURIComponent(accountId)}/${encodeURIComponent(taskId)}/complete`, { method: 'POST' });

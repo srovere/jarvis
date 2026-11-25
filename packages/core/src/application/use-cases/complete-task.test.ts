@@ -19,7 +19,7 @@ describe('CompleteTask', () => {
 
   it('completes the task at the provider and leaves it completed in the DB', async () => {
     const r = await uc.execute({ taskId: 't1' });
-    expect(r).toEqual({ id: 't1', title: 'Task t1', list: 'Mine' });
+    expect(r).toEqual({ id: 't1', accountId: 'a1', title: 'Task t1', list: 'Mine' });
     expect(await f.repos.tasks.open({ accountIds: ['a1'] })).toEqual([]);
     const done = await f.repos.tasks.completed({ accountIds: ['a1'] });
     expect(done.map((t) => t.id)).toEqual(['t1']);

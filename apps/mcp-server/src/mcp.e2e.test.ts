@@ -235,6 +235,7 @@ describe('mcp-server (Streamable HTTP)', () => {
     expect(r.structuredContent.events.map((e: { title: string }) => e.title)).toEqual([`${CAL_OPEN}Standup${CLOSE}`]);
     expect(text(r)).toContain(`${CAL_OPEN}Standup${CLOSE}`);
     const mail = r.structuredContent.priorityEmails[0];
+    expect(mail.accountId).toBe('personal');
     expect(mail.subject).toBe(`${OPEN}Budget 2027${CLOSE}`);
     expect(mail.from).toBe(`${OPEN}Ana <ana@client.com>${CLOSE}`);
     expect(text(r)).toContain(`From: ${OPEN}Ana <ana@client.com>${CLOSE} — ${OPEN}Budget 2027${CLOSE}`);
@@ -318,6 +319,12 @@ describe('mcp-server (Streamable HTTP)', () => {
 
     const created = await call(client, 'create_task', { title: 'Call Ana', due: '2026-11-25' });
     expect(created.structuredContent).toMatchObject({ title: 'Call Ana', list: 'My tasks' });
+
+    expect(created.structuredContent.accountId).toBe('personal');
+    const inList = await call(client, 'create_task', { title: 'Explicit list', list_id: 'l1' });
+    expect(inList.structuredContent).toMatchObject({ title: 'Explicit list', list: 'My tasks', accountId: 'personal' });
+    const badList = await call(client, 'create_task', { title: 'Nope', list_id: 'missing' });
+    expect(badList.isError).toBe(true);
 
     const done = await call(client, 'complete_task', { task_id: 'k1' });
     expect(done.isError).toBeFalsy();
