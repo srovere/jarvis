@@ -5,7 +5,7 @@ import { plainText } from '@/api/external-content';
 import { useSettings } from '@/api/hooks';
 import { QueryState } from '@/components/query-state';
 import { Card } from '@/components/ui/card';
-import { clock, fmtMinutes } from '@/lib/dates';
+import { clock, dayLabel, fmtMinutes, longDayLabel } from '@/lib/dates';
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
@@ -56,7 +56,10 @@ export function TodayPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Today</h1>
+      <div>
+        <h1 className="text-xl font-semibold">Today</h1>
+        {query.data && <p className="text-sm text-neutral-500">{longDayLabel(query.data.date)}</p>}
+      </div>
       <QueryState query={query}>
         {(t) => (
           <>
@@ -108,6 +111,17 @@ export function TodayPage() {
                     <li key={k.id}>
                       <Link className="hover:underline" to="/tasks">
                         {plainText(k.title)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <h3 className="mb-2 mt-4 text-sm font-medium">Coming up</h3>
+                <ul className="space-y-1 text-sm" aria-label="Coming up">
+                  {(t.upcoming ?? []).length === 0 && <li className="text-neutral-500">Nothing in the next 7 days.</li>}
+                  {(t.upcoming ?? []).map((k) => (
+                    <li key={k.id}>
+                      <Link className="hover:underline" to="/tasks">
+                        {k.due && <span className="text-neutral-500">{dayLabel(k.due.slice(0, 10))}</span>} {plainText(k.title)}
                       </Link>
                     </li>
                   ))}

@@ -52,6 +52,8 @@ export interface DailyBriefing {
   events: BriefingEvent[];
   priorityEmails: BriefingEmail[];
   tasksDue: BriefingTask[];
+  /** Open tasks due in the 7 days after the date, soonest first (at most 5). */
+  tasksUpcoming: BriefingTask[];
   /** Free minutes within the day's work hours (from now if the day is in progress; 0 on a non-work day). */
   freeMinutes: number;
   accountsNeedingReauth: string[];

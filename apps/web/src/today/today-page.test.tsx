@@ -16,6 +16,7 @@ const today = {
   ],
   emails: [{ threadId: 't9', accountId: 'a2', from: '<external_content source="email">Ana</external_content>', subject: '<external_content source="email"><b>Budget</b></external_content>', date: '2026-11-25T08:00:00.000+00:00', snippet: 'hi' }],
   tasks: [{ id: 'k1', accountId: 'a1', title: 'File taxes', due: '2026-11-25', list: 'My Tasks' }],
+  upcoming: [{ id: 'k2', accountId: 'a1', title: 'Renew passport', due: '2026-11-27T00:00:00.000-03:00', list: 'My Tasks' }],
 };
 
 describe('Today', () => {
@@ -29,6 +30,9 @@ describe('Today', () => {
     expect((await card('Priority emails')).textContent).toBe('1');
     expect((await card('Tasks due')).textContent).toBe('3');
     expect(screen.getByRole('heading', { name: 'Agenda' })).toBeInTheDocument();
+    expect(screen.getByText('Wednesday, November 25, 2026')).toBeInTheDocument();
+    const comingUp = screen.getByRole('list', { name: 'Coming up' });
+    expect(within(comingUp).getByRole('link').textContent).toBe('Fri, Nov 27 Renew passport');
     expect(screen.getByRole('heading', { name: 'Priority emails' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Tasks due' })).toBeInTheDocument();
     // External content is plain text: wrapper stripped, markup not interpreted.

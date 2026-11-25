@@ -14,6 +14,9 @@ import { isAttended, isoIn, toBriefingEvent, toBriefingTasks, type BriefingEmail
 /** How far back before the day the priority-email candidates go. */
 const EMAIL_LOOKBACK_DAYS = 7;
 const EMAIL_CANDIDATES_PER_ACCOUNT = 100;
+/** `tasksUpcoming`: open tasks due in this many days after the requested day, at most `MAX_UPCOMING_TASKS`. */
+const UPCOMING_DAYS = 7;
+const MAX_UPCOMING_TASKS = 5;
 
 /** Builds the briefing of one day (today + `dateOffsetDays` in the configured zone) from the synced data. */
 export class GetDailyBriefing {
@@ -43,13 +46,21 @@ export class GetDailyBriefing {
       .sort((a, b) => a.range.start.toMillis() - b.range.start.toMillis())
       .map((e) => toBriefingEvent(e, zone));
 
-    const [due, lists] = await Promise.all([this.tasks.open({ accountIds: ids, dueBefore: range.end }), this.tasks.lists(ids)]);
+    const upcomingEnd = range.end.plus({ days: UPCOMING_DAYS });
+    const [open, lists] = await Promise.all([this.tasks.open({ accountIds: ids, dueBefore: upcomingEnd }), this.tasks.lists(ids)]);
+    const isDue = (t: { due?: DateTime }) => t.due !== undefined && t.due < range.end;
+    const due = open.filter(isDue);
+    const upcoming = open
+      .filter((t) => !isDue(t))
+      .sort((a, b) => (a.due?.toMillis() ?? 0) - (b.due?.toMillis() ?? 0))
+      .slice(0, MAX_UPCOMING_TASKS);
 
     return {
       date: day.toISODate()!,
       events,
       priorityEmails: await this.priorityEmails(active, range, settings),
       tasksDue: toBriefingTasks(due, lists, zone),
+      tasksUpcoming: toBriefingTasks(upcoming, lists, zone),
       freeMinutes: await this.freeMinutes(day, ids, settings),
       accountsNeedingReauth: all.filter((a) => a.status === 'needs_reauth').map((a) => a.id),
     };

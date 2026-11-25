@@ -38,7 +38,7 @@ export const defaultPreferences: Preferences = {
   briefing: { maxPriorityEmails: 10 },
 };
 
-export const emptyToday = { date: '2026-11-25', cards: { meetings: 0, freeMinutes: 0, priorityEmails: 0, tasksDue: 0 }, events: [], emails: [], tasks: [] };
+export const emptyToday = { date: '2026-11-25', cards: { meetings: 0, freeMinutes: 0, priorityEmails: 0, tasksDue: 0 }, events: [], emails: [], tasks: [], upcoming: [] };
 
 /** Handlers the shell needs around any dashboard view (setup, accounts, sync status, settings). */
 export function mockShell(accounts = [account()]) {

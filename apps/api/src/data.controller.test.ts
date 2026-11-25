@@ -236,6 +236,7 @@ describe('data endpoints (API -> MCP client -> in-process mcp-server)', () => {
       expect(r.json.emails.map((e: { threadId: string }) => e.threadId)).toEqual(['t1']);
       expect(r.json.emails[0].subject).toContain('<external_content source="email">Budget 2027');
       expect(r.json.tasks.map((t: { id: string }) => t.id)).toEqual(['k1']);
+      expect(r.json.upcoming).toEqual([]);
       expect(r.json).not.toHaveProperty('freeMinutes');
     });
   });

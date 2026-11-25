@@ -95,6 +95,30 @@ describe('GetDailyBriefing', () => {
     expect(b.tasksDue).toEqual([{ id: 'due-tue', accountId: 'a1', title: 'Task due-tue', due: '2026-11-24T15:00:00.000-03:00', list: 'Inbox' }]);
   });
 
+  it('lists up to 5 open tasks due in the 7 days after the requested day as tasksUpcoming, soonest first', async () => {
+    await f.repos.tasks.upsertLists('a1', [{ id: 'l1', accountId: 'a1', title: 'Inbox', isDefault: true }]);
+    // The requested day is Tuesday 2026-11-24; its 7 following days end at Wednesday 2026-12-02 00:00.
+    const due = { today: '2026-11-24T15:00:00', d1: '2026-11-25T09:00:00', d2: '2026-11-26T09:00:00', d3: '2026-11-27T09:00:00',
+      d4: '2026-11-28T09:00:00', d5: '2026-11-29T09:00:00', d7: '2026-12-01T23:00:00', d8: '2026-12-02T00:00:00' };
+    await f.repos.tasks.applyChanges('a1', 'l1', [
+      ...Object.entries(due).reverse().map(([id, when]) => ({ kind: 'upsert' as const, task: task(id, 'a1', { due: at(when) }) })),
+      { kind: 'upsert', task: task('no-due', 'a1') },
+    ]);
+    const b = await useCase().execute({ dateOffsetDays: 1 });
+    expect(b.tasksDue.map((t) => t.id)).toEqual(['today']);
+    expect(b.tasksUpcoming.map((t) => t.id)).toEqual(['d1', 'd2', 'd3', 'd4', 'd5']);
+    expect(b.tasksUpcoming[0]).toEqual({ id: 'd1', accountId: 'a1', title: 'Task d1', due: '2026-11-25T09:00:00.000-03:00', list: 'Inbox' });
+  });
+
+  it('tasksUpcoming reaches the last of the 7 days but not the day after', async () => {
+    await f.repos.tasks.upsertLists('a1', [{ id: 'l1', accountId: 'a1', title: 'Inbox', isDefault: true }]);
+    await f.repos.tasks.applyChanges('a1', 'l1', [
+      { kind: 'upsert', task: task('d7', 'a1', { due: at('2026-12-01T23:00:00') }) },
+      { kind: 'upsert', task: task('d8', 'a1', { due: at('2026-12-02T00:00:00') }) },
+    ]);
+    expect((await useCase().execute({ dateOffsetDays: 1 })).tasksUpcoming.map((t) => t.id)).toEqual(['d7']);
+  });
+
   it('lists accounts needing re-auth and leaves their data out', async () => {
     await f.addAccount('a2', 'needs_reauth');
     await f.repos.events.applyChanges('a2', [{ kind: 'upsert', event: event('other', 'a2', '2026-11-24T10:00:00', '2026-11-24T11:00:00') }]);

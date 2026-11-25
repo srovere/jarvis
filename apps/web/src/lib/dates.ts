@@ -24,6 +24,10 @@ export function todayIn(zone?: string): string {
 export const dayLabel = (d: string) =>
   new Date(toUtc(d)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
+/** e.g. `Wednesday, November 25, 2026`. */
+export const longDayLabel = (d: string) =>
+  new Date(toUtc(d)).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+
 /** `HH:mm` of an ISO date-time as written (its own offset is the configured zone's); empty for date-only values. */
 export const clock = (iso: string) => (iso.length > 10 ? iso.slice(11, 16) : '');
 

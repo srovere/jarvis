@@ -34,6 +34,8 @@ interface BriefingResult {
   events: unknown[];
   priorityEmails: unknown[];
   tasksDue: unknown[];
+  /** Absent from an older mcp-server. */
+  tasksUpcoming?: unknown[];
   freeMinutes: number;
 }
 
@@ -56,6 +58,7 @@ export class TodayController {
       events: b.events,
       emails: b.priorityEmails,
       tasks: b.tasksDue,
+      upcoming: b.tasksUpcoming ?? [],
     };
   }
 }

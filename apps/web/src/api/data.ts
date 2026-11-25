@@ -41,6 +41,8 @@ export interface TodayData {
   events: EventItem[];
   emails: EmailItem[];
   tasks: TaskItem[];
+  /** Open tasks due in the next 7 days, soonest first (at most 5). */
+  upcoming: TaskItem[];
 }
 
 export interface EmailMessage {

@@ -240,6 +240,8 @@ describe('mcp-server (Streamable HTTP)', () => {
     expect(mail.from).toBe(`${OPEN}Ana <ana@client.com>${CLOSE}`);
     expect(text(r)).toContain(`From: ${OPEN}Ana <ana@client.com>${CLOSE} — ${OPEN}Budget 2027${CLOSE}`);
     expect(r.structuredContent.tasksDue.map((t: { id: string }) => t.id)).toEqual(['k1']);
+    expect(r.structuredContent.tasksUpcoming).toEqual([]);
+    expect(text(r)).toContain('No tasks due in the next 7 days.');
     expect(r.structuredContent.priorityEmails[0].snippet).toMatch(new RegExp(`^${OPEN}.*${CLOSE}$`, 's'));
     expect(text(r)).toContain('2026-11-23');
     expect(text(r)).toContain(`${OPEN}Hi, shall we review the budget tomorrow?${CLOSE}`);
