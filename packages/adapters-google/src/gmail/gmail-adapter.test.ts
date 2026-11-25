@@ -8,10 +8,24 @@ import { htmlToPlainText } from '../html-to-text';
 const OPTS = { initialWindowDays: 90 };
 const fakes: FakeGmail[] = [];
 
-function setup(opts: ConstructorParameters<typeof FakeGmail>[0] = {}) {
+function setup(
+  opts: ConstructorParameters<typeof FakeGmail>[0] = {},
+  adapterOpts: ConstructorParameters<typeof GmailAdapter>[2] = {},
+) {
   const fake = new FakeGmail({ now: () => T0.plus({ hours: 1 }).toMillis(), ...opts });
   fakes.push(fake);
-  return { fake, adapter: new GmailAdapter(fake.asGmail(), 'acc') };
+  return { fake, adapter: new GmailAdapter(fake.asGmail(), 'acc', adapterOpts) };
+}
+
+/** A clock that only moves when the adapter sleeps, recording every wait. */
+function virtualTime(delaysMs: number[] = [1_000, 2_000]) {
+  let t = 0;
+  const waits: number[] = [];
+  return {
+    waits,
+    now: () => t,
+    retry: { delaysMs, maxWaitMs: 60_000, sleep: async (ms: number) => void (waits.push(ms), (t += ms)) },
+  };
 }
 
 afterEach(() => {
@@ -217,6 +231,28 @@ describe('GmailAdapter reading', () => {
 });
 
 describe('GmailAdapter sync', () => {
+  it('full sync paces message fetches: batches of 10 start at least 250 ms apart', async () => {
+    const time = virtualTime();
+    const { adapter } = setup({}, { retry: time.retry, now: time.now });
+    const fake = fakes[fakes.length - 1]!;
+    fake.seed(Array.from({ length: 25 }, (_, i) => buildThread(`t${i}`, 'S', [msg(`m${i}`, i, { threadId: `t${i}` })])));
+    const r = await adapter.sync(null, OPTS);
+    expect(r.changes).toHaveLength(25);
+    expect(time.waits).toEqual([250, 250]);
+  });
+
+  it('full sync survives a rate-limited message fetch by waiting and retrying it', async () => {
+    const time = virtualTime();
+    const { fake, adapter } = setup({}, { retry: time.retry, now: time.now });
+    fake.seed([buildThread('t1', 'Hello', [msg('m1', 0), msg('m2', 1)])]);
+    fake.calls.messagesGet.mockImplementationOnce(() => {
+      throw Object.assign(new Error("Quota exceeded for quota metric 'Total Query Cost'"), { code: 429 });
+    });
+    const r = await adapter.sync(null, OPTS);
+    expect(r.changes.map((c) => (c.kind === 'upsert' ? c.message.id : '')).sort()).toEqual(['m1', 'm2']);
+    expect(time.waits).toEqual([1_000]);
+  });
+
   it('full sync paginates, windows by newer_than and uses the profile historyId as cursor', async () => {
     const { fake, adapter } = setup({ pageSize: 2 });
     fake.seed([

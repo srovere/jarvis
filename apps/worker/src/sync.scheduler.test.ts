@@ -103,6 +103,14 @@ describe('SyncScheduler', () => {
     );
   });
 
+  it('counts an account whose mail sync failed as failed in the summary', async () => {
+    const mailFailed: SyncAccountResult = { ...OK, resources: { mail: 'error', calendar: 'ok', tasks: 'ok' } };
+    const execute = vi.fn(async (id: string) => (id === 'personal' ? mailFailed : OK));
+    const { scheduler, lines } = await setup([account('personal'), account('work')], execute);
+    await scheduler.tick();
+    expect(lines.map((l) => JSON.parse(l))).toContainEqual({ level: 'warn', msg: 'sync finished', accounts: 2, failed: 1 });
+  });
+
   it('on bootstrap catches up when an account is overdue and registers the interval', async () => {
     const { scheduler, syncer, registry } = await setup([account('personal')]);
     toStop = scheduler;

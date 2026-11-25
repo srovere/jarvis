@@ -12,7 +12,7 @@ import type {
   SyncResult,
 } from '@jarvis/core';
 import type { gmail_v1 } from 'googleapis';
-import { callGoogle, isNotFound } from '../google-errors';
+import { callGoogle, DEFAULT_RETRY, isNotFound, type RetryPolicy } from '../google-errors';
 import { GmailMapper } from './gmail-mapper';
 import { buildMime } from './mime-builder';
 
@@ -21,6 +21,11 @@ const LIST_HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date'];
 const SYNC_HEADERS = [...LIST_HEADERS, 'Message-ID', 'References'];
 const HISTORY_TYPES = ['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'];
 const FETCH_BATCH = 10;
+/**
+ * Minimum time between the starts of two fetch batches. A `messages.get` costs 5 quota units and Gmail allows 250
+ * units per second per user: 10 messages every 250 ms is 200 units/s, under the limit with some margin.
+ */
+export const MIN_BATCH_INTERVAL_MS = 250;
 /** Messages with these labels are neither synced nor used as a reply anchor (DRAFT). */
 const EXCLUDED_LABELS = ['DRAFT', 'TRASH', 'SPAM'];
 const isExcluded = (m: { labels: string[] }): boolean => m.labels.some((l) => EXCLUDED_LABELS.includes(l));
@@ -33,11 +38,19 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
   private readonly mapper: GmailMapper;
   private sendAs?: Promise<gmail_v1.Schema$SendAs[]>;
 
+  private readonly retry: RetryPolicy;
+  private readonly minBatchIntervalMs: number;
+  private readonly now: () => number;
+
   constructor(
     private readonly gmail: gmail_v1.Gmail,
     private readonly accountId: string,
+    options: { retry?: RetryPolicy; minBatchIntervalMs?: number; now?: () => number } = {},
   ) {
     this.mapper = new GmailMapper(accountId);
+    this.retry = options.retry ?? DEFAULT_RETRY;
+    this.minBatchIntervalMs = options.minBatchIntervalMs ?? MIN_BATCH_INTERVAL_MS;
+    this.now = options.now ?? Date.now;
   }
 
   async ownAddresses(): Promise<EmailAddress[]> {
@@ -211,12 +224,19 @@ export class GmailAdapter implements MailReader, DraftWriter, IdentityProvider {
   }
 
   private call<T>(request: () => Promise<{ data: T }>): Promise<T> {
-    return callGoogle(this.accountId, request);
+    return callGoogle(this.accountId, request, this.retry);
   }
 
+  /** Runs `fn` over `items`, `FETCH_BATCH` at a time, starting batches at least `minBatchIntervalMs` apart. */
   private async inBatches<I, O>(items: I[], fn: (item: I) => Promise<O>): Promise<O[]> {
     const out: O[] = [];
+    let lastStart: number | undefined;
     for (let i = 0; i < items.length; i += FETCH_BATCH) {
+      if (lastStart !== undefined) {
+        const wait = lastStart + this.minBatchIntervalMs - this.now();
+        if (wait > 0) await this.retry.sleep(wait);
+      }
+      lastStart = this.now();
       out.push(...(await Promise.all(items.slice(i, i + FETCH_BATCH).map(fn))));
     }
     return out;

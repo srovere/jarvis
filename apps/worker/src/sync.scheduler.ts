@@ -132,8 +132,12 @@ export class SyncScheduler implements OnApplicationBootstrap, OnModuleDestroy {
   private async runOnce(): Promise<void> {
     try {
       const outcomes = await this.runner.run();
-      const failed = outcomes.filter((o) => o.error !== undefined).length;
-      this.log(JSON.stringify({ level: 'info', msg: 'sync finished', accounts: outcomes.length, failed }));
+      // An account counts as failed when its sync aborted or any of its resources (mail, calendar, tasks) failed.
+      const failed = outcomes.filter(
+        (o) => o.error !== undefined || Object.values(o.result?.resources ?? {}).includes('error'),
+      ).length;
+      const level = failed > 0 ? 'warn' : 'info';
+      this.log(JSON.stringify({ level, msg: 'sync finished', accounts: outcomes.length, failed }));
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
       this.log(JSON.stringify({ level: 'error', msg: 'sync run failed', error }));
