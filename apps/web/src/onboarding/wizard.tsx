@@ -19,7 +19,9 @@ function Resume() {
   const { search } = useLocation();
   if (isPending) return <p className="text-sm text-neutral-500">Loading…</p>;
   if (isError) return <p role="alert" className="text-sm text-red-700">Could not load setup status: {error.message}</p>;
-  // The query string (?connected= / ?error=) is only meaningful to the mail step.
+  // An OAuth result (?connected= / ?error=) always belongs to the mail step, whatever the setup state.
+  const params = new URLSearchParams(search);
+  if (params.has('error') || params.has('connected')) return <Navigate to={{ pathname: '/onboarding/mail', search }} replace />;
   if (data.accounts === 0) return <Navigate to={{ pathname: '/onboarding/mail', search }} replace />;
   if (data.agent === 'none') return <Navigate to="/onboarding/agent" replace />;
   if (!data.preferencesSaved) return <Navigate to="/onboarding/preferences" replace />;

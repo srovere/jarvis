@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CalendarInfo } from '@/api/client';
 import { App } from '@/app/app';
 import { createTestRouter } from '@/app/router';
@@ -28,13 +28,14 @@ function mockPrefs(calendars: CalendarInfo[], accounts = [account()]) {
 const cal = (over: Partial<CalendarInfo>): CalendarInfo => ({ accountId: 'a1', id: 'primary', title: 'me@example.com', primary: true, busy: true, ...over });
 
 describe('preferences step', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('prefills the time zone from the browser and shows the labelled combobox', async () => {
+    vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({ timeZone: 'America/Argentina/Buenos_Aires' } as Intl.ResolvedDateTimeFormatOptions);
     mockPrefs([cal({})]);
     renderAt('/onboarding/preferences');
     const zone = await screen.findByRole('combobox', { name: 'Time zone' });
-    const browser = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const city = browser.split('/').pop()!.replace(/_/g, ' ');
-    expect((zone as HTMLInputElement).value).toMatch(new RegExp(`^${city} — .* \\(UTC[+-]\\d\\d:\\d\\d\\)$`));
+    expect((zone as HTMLInputElement).value).toBe('Buenos Aires — America (UTC-03:00)');
   });
 
   it('searches time zones by typing', async () => {

@@ -53,11 +53,18 @@ describe('mail step', () => {
 
   it('lists connected accounts and offers to add another', async () => {
     mockOnboarding({ setup: { ...fresh, accounts: 1, googleClient: 'present' }, accounts: [account()] });
-    renderAt('/onboarding/mail?connected=a1');
+    renderAt('/onboarding?connected=a1');
     expect(await screen.findByText('me@example.com')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Add another account' })).toHaveAttribute('href', '/api/oauth/google/start?returnTo=/onboarding');
     expect(screen.getByRole('link', { name: 'Continue' })).toHaveAttribute('href', '/onboarding/agent');
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('keeps the OAuth error on the mail step when accounts already exist', async () => {
+    mockOnboarding({ setup: { ...fresh, accounts: 1, googleClient: 'present' }, accounts: [account()] });
+    renderAt('/onboarding?error=Access%20was%20denied.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Access was denied.');
+    expect(await screen.findByRole('link', { name: 'Add another account' })).toBeInTheDocument();
   });
 
   it('shows the error from the OAuth callback', async () => {
