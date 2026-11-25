@@ -34,35 +34,44 @@ flowchart LR
 
 ## 2. Containers (Docker Compose)
 
+Started by `./jarvis start`; only `api` and `mcp-server` publish ports, both on `127.0.0.1`.
+
 ```mermaid
 flowchart TB
   subgraph compose["docker compose (ports on 127.0.0.1 only)"]
-    web["web<br/>React + Vite (nginx)"]
-    api["api<br/>NestJS"]
+    api["api<br/>NestJS + built React dashboard<br/>+ claude CLI"]
     mcp["mcp-server<br/>NestJS + MCP SDK<br/>Streamable HTTP"]
     worker["worker<br/>NestJS + @nestjs/schedule"]
+    migrate["migrate<br/>(runs once)"]
     db[("db<br/>PostgreSQL 17")]
+    data[/"jarvis_data volume<br/>/data"/]
   end
-  web -- REST / SSE --> api
+  browser["browser"] -- "127.0.0.1:3000" --> api
+  client["Claude Code / Inspector"] -- "127.0.0.1:3002 (bearer)" --> mcp
   api -- MCP client --> mcp
-  api -- spawn --> cli1["claude -p<br/>(chat)"]
-  cli1 -- MCP client --> mcp
-  worker -- spawn --> cli2["claude -p<br/>(summaries)"]
-  mcp --> core
-  api --> core
-  worker --> core
-  core["packages/core<br/>(domain + adapters)"] --> db
+  api -- spawn --> cli["claude -p<br/>(verify token)"]
+  mcp --> db
+  api --> db
+  worker --> db
+  migrate --> db
+  api --- data
+  worker --- data
+  mcp --- data
 ```
 
 | Container | Role | Exposes |
 |---|---|---|
-| `web` | React dashboard. No business logic. | `127.0.0.1:3000` |
-| `api` | Dashboard backend: reads/writes through an **MCP client**, admin endpoints (registry, linking, approvals), chat orchestration (`AgentRunner`), SSE streaming. | `127.0.0.1:3001` |
-| `mcp-server` | **The agents' only gateway** to data and actions. Domain tools on top of `core`. | `127.0.0.1:3002` (bearer token) |
-| `worker` | Jobs: sync, project discovery, snapshots, task mirror, AI queue. | — |
-| `db` | Persistence. | internal network only |
+| `api` | Serves the built dashboard and `/api/*`. User data goes through an **MCP client** to `mcp-server`; installation state (setup status, accounts, OAuth, settings, agent) through application services. Ships the pinned Claude Code CLI to verify the subscription token. Rejects any `Host`/`Origin` other than `127.0.0.1:3000`/`localhost:3000`. | `127.0.0.1:3000` |
+| `mcp-server` | **The agents' only gateway** to data and actions: domain tools on top of `core`. | `127.0.0.1:3002` (bearer token) |
+| `worker` | Sync jobs; reads settings and active accounts at every tick. | none |
+| `migrate` | Applies the database migrations and exits; `api`, `worker` and `mcp-server` wait for it. | none |
+| `db` | PostgreSQL 17 (`pgdata` volume). | internal network only |
 
-`api` and `worker` ship the Claude Code CLI; the subscription token arrives as a Docker secret.
+Volumes: `pgdata` (database) and `jarvis_data` mounted at `/data` in `api`, `worker` and `mcp-server`
+(`tokens/`, `google/oauth-client.json`, `agent/claude-token`, all mode `0600`; pre-created owned by uid 1000, the
+`node` user). Docker secrets from `./secrets`: `pg_password` (all services) and `mcp_token` (`api`, `mcp-server`).
+The YAML config and the legacy `google_oauth_client` secret are optional and not part of the default compose file
+(see the README, "Advanced").
 
 ## 3. Layers and dependencies (ports and adapters)
 

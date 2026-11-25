@@ -6,6 +6,7 @@ export default mergeConfig(
   sharedConfig,
   defineConfig({
     plugins: [swc.vite({ module: { type: 'es6' } })],
-    test: { include: ['src/**/*.test.ts'] },
+    // src/e2e/ boots a long-running server for the Playwright smoke test (vitest.e2e.config.ts).
+    test: { include: ['src/**/*.test.ts'], exclude: ['src/e2e/**', '**/node_modules/**'] },
   }),
 );

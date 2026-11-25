@@ -1,6 +1,7 @@
 # Jarvis — Pending work
 
-Status as of 2026-11-24. Phase 1 and its final-review fixes are merged into `main`.
+Status as of 2026-11-25. Phase 1 is merged into `main`; phase 4a (dashboard + onboarding) is implemented on
+`feat/phase4a-dashboard`, pending the real-account verification below.
 
 ## Where we are
 
@@ -22,10 +23,11 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
 1. ~~Final whole-branch review + fix round~~ — done and merged on 2026-11-24 (C1, C2, I1-I5 fixed).
    Re-check C1 (live Google tools from the `mcp-server` container) and C2 (re-authorization recovery) during the
    real-account verification.
-2. **Phase 4a — dashboard + onboarding** (design approved 2026-11-24:
-   [`superpowers/specs/2026-11-24-jarvis-dashboard-onboarding-design.md`](superpowers/specs/2026-11-24-jarvis-dashboard-onboarding-design.md)).
-   It absorbs the onboarding wizard; real verification with the Google account happens through the wizard
-   (re-check C1 and C2 there). Create a test draft and event only with explicit confirmation.
+2. **Phase 4a — dashboard + onboarding** ([design](superpowers/specs/2026-11-24-jarvis-dashboard-onboarding-design.md)):
+   implemented (`./jarvis start`, `api` container, React dashboard, onboarding wizard, Settings, Claude token step,
+   Playwright smoke test). **Remaining: verify with the real Google account through the wizard** (re-check C1 and C2
+   there, the "unverified app" screens, the 5th scope and the Claude token verification inside the `api` container).
+   Create a test draft and event only with explicit confirmation.
 3. **Documentation** (see next section).
 4. Next phases, in the new order: 3 Agent (Claude Code, highlights, meeting summaries, chat, action approval) ·
    2 Projects (local/SSH, discovery, people, task mirror) · 5 Analytics.
@@ -49,18 +51,26 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
       `jarvis.config.yaml` key and `JARVIS__…` overrides, multiple accounts, day-to-day operation (logs,
       `sync --once`, re-authorizing), upgrades, Postgres backup/restore, moving to another machine, common problems.
 
-## Onboarding wizard (part of phase 4a)
+## Onboarding wizard (phase 4a): done
 
-A guided setup that replaces the manual README steps:
+- [x] Mail and calendar accounts: provider select, OAuth client upload, Connect with Google, accounts in the database.
+- [x] AI agent subscription: Claude token (`setup-token`), verified with the CLI in the `api` container; skippable.
+- [x] Secrets generation: `./jarvis start` creates `secrets/mcp_token` and `secrets/pg_password` (`0600`, never
+      overwritten) and warns about uid != 1000.
+- [x] Installation docs rewritten around `./jarvis start` (README).
 
-- [ ] **Mail and calendar accounts** — choose the provider first (Google today; others later), then associate the
-      account (OAuth flow, calendars to sync) and write it to `jarvis.config.yaml`.
-- [ ] **AI agent subscription** — choose the provider first (Claude subscription via the `claude` CLI; never an API
-      key), then connect and verify it.
-- [ ] **Secrets generation** — create `secrets/mcp_token`, `secrets/pg_password` and place the OAuth client file,
-      with the right permissions/ownership for the containers.
-- [ ] **Rest of the setup** — the remaining steps from the installation guide (start the stack, connect the MCP
-      client, verify), plus documentation of the wizard itself.
+### Deferred from phase 4a
+
+- [ ] CI: nothing runs `pnpm test`, `pnpm e2e` or the image builds automatically yet.
+- [ ] The Playwright smoke test only covers the happy path; add the OAuth denied / wrong client file paths.
+- [ ] "Use Jarvis's client" option (needs a verified Google client shipped with the build; designed, not built).
+- [ ] `./jarvis`: no `update`/`reset` subcommands; migrating the phase 1 `jarvis_tokens` volume is not supported
+      (it only warns).
+- [ ] Port 3000/3002 are fixed (the OAuth redirect URI and the `Host` allow-list depend on `127.0.0.1:3000`); a
+      conflict with another local program must be solved by stopping that program.
+- [ ] Run the containers read-only (`read_only: true` + tmpfs `/tmp`): the spike showed only `/tmp` and `/data` need
+      to be writable.
+- [ ] Windows/macOS: the uid note and ACL commands are Linux-specific; untested with Docker Desktop.
 
 ## Technical items (for the final review)
 
@@ -96,8 +106,6 @@ A guided setup that replaces the manual README steps:
 - `search_emails` results have no `accountId`, so the model cannot pass `account_id` to `read_thread` (matters with
   several accounts); `create_gmail_draft` with a `thread_id` from a second account fails.
 - `search_emails`: the "latest message" of a thread can be the user's own unsent draft; skip `DRAFT`.
-- `.env.example` lists `MCP_BEARER_TOKEN`, which nothing reads (the server reads `mcp.tokenFile`); a local run
-  outside Docker needs `secretsDir`/`dataDir`/`tokenFile` overrides the README does not mention.
 - Draft link `#drafts?compose=<draftId>`: Gmail may expect the message id; check in the real-account verification.
 - Gmail full sync is all-or-nothing: a 403 `userRateLimitExceeded` restarts the whole 90-day fetch next tick.
 - An event shared by two busy calendars is listed twice in the briefing and in `list_events`.

@@ -163,3 +163,7 @@ jarvis.config.yaml
 .env
 dist/
 .superpowers/
+
+# Playwright
+test-results/
+playwright-report/

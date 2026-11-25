@@ -1,13 +1,8 @@
-# Local Jarvis deployment. Secrets live in ./secrets (git-ignored); see README.md.
+# Local Jarvis deployment, started with ./jarvis start. Secrets live in ./secrets (git-ignored); see README.md.
+# No jarvis.config.yaml is needed: accounts and preferences are set up in the browser at http://127.0.0.1:3000.
 x-jarvis-env: &jarvis-env
-  JARVIS_CONFIG: /app/jarvis.config.yaml
   PGPASSWORD_FILE: /run/secrets/pg_password
-
-x-jarvis-config: &jarvis-config
-  type: bind
-  source: ./jarvis.config.yaml
-  target: /app/jarvis.config.yaml
-  read_only: true
+  JARVIS_DATA_DIR: /data
 
 services:
   db:
@@ -35,8 +30,6 @@ services:
     command: ["node", "dist/cli/jarvis.js", "migrate"]
     environment: *jarvis-env
     secrets: [pg_password]
-    volumes:
-      - *jarvis-config
     depends_on:
       db: { condition: service_healthy }
     restart: "no"
@@ -46,10 +39,9 @@ services:
     image: jarvis-worker
     restart: unless-stopped
     environment: *jarvis-env
-    secrets: [pg_password, google_oauth_client]
+    secrets: [pg_password]
     volumes:
-      - *jarvis-config
-      - jarvis_tokens:/data/tokens
+      - jarvis_data:/data
     depends_on:
       migrate: { condition: service_completed_successfully }
 
@@ -64,12 +56,11 @@ services:
       <<: *jarvis-env
       # Inside the container it must listen on all interfaces; the port published to the host is 127.0.0.1 only.
       JARVIS__MCP__BIND: 0.0.0.0
-    # Live Google tools (drafts, focus blocks, tasks) need the OAuth client secret and the token
-    # volume. Read-write: a token refresh rewrites the token file (atomically, same uid as the worker).
-    secrets: [pg_password, mcp_token, google_oauth_client]
+    # Live Google tools (drafts, focus blocks, tasks) read the uploaded OAuth client and the tokens from /data.
+    # Read-write: a token refresh rewrites the token file (atomically, same uid as the worker).
+    secrets: [pg_password, mcp_token]
     volumes:
-      - *jarvis-config
-      - jarvis_tokens:/data/tokens
+      - jarvis_data:/data
     ports:
       - "127.0.0.1:3002:3002"
     healthcheck:
@@ -81,9 +72,33 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
 
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    image: jarvis-api
+    restart: unless-stopped
+    environment:
+      <<: *jarvis-env
+      JARVIS_MCP_URL: http://mcp-server:3002/mcp
+      JARVIS_MCP_TOKEN_FILE: /run/secrets/mcp_token
+    secrets: [pg_password, mcp_token]
+    volumes:
+      - jarvis_data:/data
+    # The dashboard and /api; published on the host's loopback only.
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health',{headers:{host:'127.0.0.1:3000'}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      mcp-server: { condition: service_healthy }
+
 secrets:
-  google_oauth_client:
-    file: ./secrets/google-oauth-client.json
   mcp_token:
     file: ./secrets/mcp_token
   pg_password:
@@ -91,4 +106,4 @@ secrets:
 
 volumes:
   pgdata:
-  jarvis_tokens:
+  jarvis_data:

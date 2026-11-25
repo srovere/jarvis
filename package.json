@@ -11,7 +11,8 @@
     "build": "pnpm -r --workspace-concurrency=1 build",
     "typecheck": "pnpm -r typecheck",
     "lint:deps": "depcruise packages apps --config .dependency-cruiser.cjs",
-    "jarvis": "pnpm --filter @jarvis/worker exec tsx src/cli/jarvis.ts"
+    "jarvis": "pnpm --filter @jarvis/worker exec tsx src/cli/jarvis.ts",
+    "e2e": "pnpm --filter @jarvis/web e2e"
   },
   "devDependencies": {
     "@swc/core": "^1.7.0",
