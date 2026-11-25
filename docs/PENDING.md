@@ -71,6 +71,23 @@ Architecture: [`architecture.md`](architecture.md) · Installation: [`../README.
 - [ ] Run the containers read-only (`read_only: true` + tmpfs `/tmp`): the spike showed only `/tmp` and `/data` need
       to be writable.
 - [ ] Windows/macOS: the uid note and ACL commands are Linux-specific; untested with Docker Desktop.
+- [ ] Host port 3000 must be free before `./jarvis start`; the script does not give a clear "port in use" message.
+- [ ] Run `shellcheck ./jarvis` once (before the real-account session); also harden the script: fail fast when a
+      container exits, uid != 1000 branch.
+- [ ] MCP connect errors are not logged in the `api` (users only see "MCP server unavailable").
+- [ ] `ListCalendars` has no per-account failure isolation (one failing account fails the list; the form falls
+      back to manual ids).
+- [ ] Agent status can be stale after a failed or thrown verify (Settings may show "connected" after replacing the
+      token with a bad one until the next verify); the wizard shows an agent "failed" as done.
+- [ ] Calendar view: multi-day events appear only on their first day.
+- [ ] `LayeredSettings.current()` has no in-flight de-duplication (at most two parallel DB reads).
+- [ ] M1: the uploaded client/agent token use `JARVIS_DATA_DIR` while tokens use `config.dataDir`; derive both from
+      one value (same in Docker, differs only for a YAML user with a custom `dataDir`).
+- [ ] M2 (intentional): the `email` settings (`maxBodyChars`) stay YAML-only although spec §5.4 lists them.
+- [ ] M3: the draft fallback link `https://mail.google.com/mail/#drafts` opens the browser's default Google account;
+      add `/u/<email>/`.
+- [ ] M5: "Reconnect" has no `login_hint`; tell the user which email to choose (picking another adds a new account).
+- [ ] Accepted deviation: timezone labels show the IANA region instead of the country (no dependency-free source).
 
 ## Technical items (for the final review)
 
