@@ -1,6 +1,7 @@
 import { createBrowserRouter, createMemoryRouter, Navigate, Outlet, type RouteObject } from 'react-router-dom';
 import { useSetupStatus } from '@/api/hooks';
 import { Button } from '@/components/ui/button';
+import { onboardingRoutes } from '@/onboarding/wizard';
 import { Placeholder } from '@/pages/placeholder';
 import { Shell } from './shell';
 
@@ -22,7 +23,7 @@ export function RequireSetup() {
 }
 
 export const routes: RouteObject[] = [
-  { path: '/onboarding/*', element: <Placeholder title="Onboarding" /> },
+  onboardingRoutes,
   {
     element: <RequireSetup />,
     children: [

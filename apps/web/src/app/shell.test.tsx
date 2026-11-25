@@ -16,6 +16,7 @@ function mockApi(opts: { setup?: SetupStatus; accounts?: Account[]; lastSyncAt?:
   const posts: { contentType: string | null; body: unknown }[] = [];
   server.use(
     http.get('/api/setup/status', () => HttpResponse.json(opts.setup ?? ready)),
+    http.get('/api/providers', () => HttpResponse.json([{ kind: 'google', label: 'Google' }])),
     http.get('/api/accounts', () => HttpResponse.json(opts.accounts ?? [account({})])),
     http.get('/api/sync', () =>
       HttpResponse.json({
@@ -38,13 +39,13 @@ describe('app shell', () => {
   it('redirects to onboarding when there are no accounts', async () => {
     mockApi({ setup: { ...ready, accounts: 0 } });
     renderAt('/');
-    expect(await screen.findByRole('heading', { name: 'Onboarding' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Set up Jarvis' })).toBeInTheDocument();
   });
 
   it('redirects to onboarding when preferences are not saved', async () => {
     mockApi({ setup: { ...ready, preferencesSaved: false } });
     renderAt('/mail');
-    expect(await screen.findByRole('heading', { name: 'Onboarding' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Set up Jarvis' })).toBeInTheDocument();
   });
 
   it('renders the nav and the Today placeholder once set up', async () => {

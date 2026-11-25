@@ -1,16 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAccounts, getSetupStatus, getSyncStatus, triggerSync } from './client';
+import { getAccounts, getCalendars, getProviders, getSettings, getSetupStatus, getSyncStatus, triggerSync } from './client';
 
 export const queryKeys = {
   setup: ['setup-status'] as const,
   accounts: ['accounts'] as const,
   sync: ['sync-status'] as const,
+  providers: (kind: string) => ['providers', kind] as const,
+  settings: ['settings'] as const,
+  calendars: ['calendars'] as const,
 };
 
 export const useSetupStatus = () => useQuery({ queryKey: queryKeys.setup, queryFn: getSetupStatus });
 export const useAccounts = () => useQuery({ queryKey: queryKeys.accounts, queryFn: getAccounts });
-export const useSyncStatus = () =>
-  useQuery({ queryKey: queryKeys.sync, queryFn: getSyncStatus, refetchInterval: 60_000 });
+export const useSyncStatus = (refetchMs = 60_000) =>
+  useQuery({ queryKey: queryKeys.sync, queryFn: getSyncStatus, refetchInterval: refetchMs });
+export const useProviders = (kind: 'mail' | 'agent') =>
+  useQuery({ queryKey: queryKeys.providers(kind), queryFn: () => getProviders(kind) });
+export const useSettings = () => useQuery({ queryKey: queryKeys.settings, queryFn: getSettings });
+export const useCalendars = () => useQuery({ queryKey: queryKeys.calendars, queryFn: getCalendars });
 
 export function useTriggerSync() {
   const qc = useQueryClient();
