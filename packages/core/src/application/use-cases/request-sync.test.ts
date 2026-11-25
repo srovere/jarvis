@@ -8,6 +8,8 @@ describe('RequestSync', () => {
   let requests: InMemorySyncRequests;
   const useCase = () => new RequestSync(f.repos.accounts, requests);
 
+  const ids = async () => (await requests.pending()).map((r) => r.accountId);
+
   beforeEach(async () => {
     f = new UseCaseFixture();
     requests = new InMemorySyncRequests();
@@ -18,17 +20,17 @@ describe('RequestSync', () => {
 
   it('requests every active account without an id', async () => {
     expect(await useCase().execute({})).toEqual(['a1', 'a2']);
-    expect(await requests.pending()).toEqual(['a1', 'a2']);
+    expect(await ids()).toEqual(['a1', 'a2']);
   });
 
   it('requests only the given account', async () => {
     expect(await useCase().execute({ accountId: 'a2' })).toEqual(['a2']);
-    expect(await requests.pending()).toEqual(['a2']);
+    expect(await ids()).toEqual(['a2']);
   });
 
   it('rejects an unknown or non-active account and requests nothing', async () => {
     await expect(useCase().execute({ accountId: 'nope' })).rejects.toThrow('Account not active: nope');
     await expect(useCase().execute({ accountId: 'off' })).rejects.toThrow('Account not active: off');
-    expect(await requests.pending()).toEqual([]);
+    expect(await ids()).toEqual([]);
   });
 });

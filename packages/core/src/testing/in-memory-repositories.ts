@@ -16,7 +16,7 @@ import type {
   SyncStateRepository,
   TaskRepository,
 } from '../domain/ports/repositories';
-import type { SyncRequests } from '../domain/ports/sync-requests';
+import type { PendingSyncRequest, SyncRequests } from '../domain/ports/sync-requests';
 import type { TaskChange } from '../domain/ports/tasks';
 
 /** Repositories that hold per-account synced data. */
@@ -97,18 +97,22 @@ export class InMemorySyncStateRepository implements SyncStateRepository {
 }
 
 export class InMemorySyncRequests implements SyncRequests {
-  private readonly ids = new Set<string>();
+  private readonly requested = new Map<string, Date>();
+  private last = 0;
 
-  async pending(): Promise<string[]> {
-    return [...this.ids];
+  async pending(): Promise<PendingSyncRequest[]> {
+    return [...this.requested].map(([accountId, requestedAt]) => ({ accountId, requestedAt }));
   }
 
-  async clear(accountId: string): Promise<void> {
-    this.ids.delete(accountId);
+  async clear(accountId: string, observedAt: Date): Promise<void> {
+    const at = this.requested.get(accountId);
+    if (at && at.getTime() <= observedAt.getTime()) this.requested.delete(accountId);
   }
 
   async request(accountIds: string[]): Promise<void> {
-    for (const id of accountIds) this.ids.add(id);
+    // Strictly increasing, so two requests never share a timestamp.
+    this.last = Math.max(Date.now(), this.last + 1);
+    for (const id of accountIds) this.requested.set(id, new Date(this.last));
   }
 }
 

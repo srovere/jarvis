@@ -90,6 +90,20 @@ describe('ClaudeCliRunner', () => {
     expect(r).toEqual({ ok: false, reason: 'Rate limited [redacted]' });
   });
 
+  it('caps a long failure text at 500 characters, redacting the token before cutting', async () => {
+    const { proc, runner } = harness();
+    const p = runner.verify();
+    await tick();
+    // The token straddles the cut point: it must be redacted first, never left half-visible.
+    proc.finish(JSON.stringify({ is_error: true, result: `${'x'.repeat(480)}${TOKEN}${'y'.repeat(2000)}` }), 1);
+    const r = await p;
+    expect(r.ok).toBe(false);
+    const reason = (r as { reason: string }).reason;
+    expect(reason.length).toBeLessThanOrEqual(500);
+    expect(reason.startsWith('x'.repeat(480))).toBe(true);
+    expect(reason).not.toContain(TOKEN.slice(0, 8));
+  });
+
   it('fails on unparsable output without echoing it', async () => {
     const { proc, runner } = harness();
     const p = runner.verify();

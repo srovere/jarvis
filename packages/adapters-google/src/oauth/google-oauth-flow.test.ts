@@ -125,6 +125,21 @@ describe('GoogleOAuthFlow', () => {
       expect(await store.read('personal')).not.toBeNull();
     });
 
+    it('rejects an empty-state callback that arrives before the authorization has started', async () => {
+      const flow = new GoogleOAuthFlow(secretPath, store, { port: 0 }, resolveEmail);
+      let early = 0;
+      let origin = '';
+      const received = flow.receiveAuthorizationCode(async (redirectUri) => {
+        origin = new URL(redirectUri).origin;
+        early = (await fetch(`${origin}/oauth2callback?code=evil&state=`)).status;
+        return { url: 'https://accounts.example/auth', state: 'real-state', verifier: 'v' };
+      });
+      await vi.waitFor(() => expect(urls.join('')).toContain('https://accounts.example/auth'));
+      expect(early).toBe(400);
+      await fetch(`${origin}/oauth2callback?code=good&state=real-state`);
+      expect(await received).toMatchObject({ code: 'good', verifier: 'v' });
+    });
+
     it('fails clearly when Google returns no refresh_token', async () => {
       vi.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({ tokens: { access_token: 'a1' } } as never);
       const flow = new GoogleOAuthFlow(secretPath, store, { port: 0 }, resolveEmail);

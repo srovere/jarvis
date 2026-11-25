@@ -1,6 +1,6 @@
 import { GOOGLE_CLIENT_STATUS, type GoogleClientStatus } from '@jarvis/composition';
-import { DomainError, TOKENS, type Clock, type ConnectAccount } from '@jarvis/core';
-import { Controller, Get, Inject, Param, Query, Res } from '@nestjs/common';
+import { DomainError, TOKENS, type Clock, type ConnectAccount, type RequestSync } from '@jarvis/core';
+import { Controller, Get, Inject, Logger, Param, Query, Res } from '@nestjs/common';
 import { OAuthPending } from './oauth-pending';
 
 interface RedirectingResponse {
@@ -24,11 +24,13 @@ const MESSAGES = {
 @Controller('api/oauth/:kind')
 export class OAuthController {
   private readonly pending = new OAuthPending();
+  private readonly logger = new Logger('OAuthController');
 
   constructor(
     @Inject(TOKENS.ConnectAccount) private readonly connect: Pick<ConnectAccount, 'begin' | 'complete'>,
     @Inject(GOOGLE_CLIENT_STATUS) private readonly googleClient: GoogleClientStatus,
     @Inject(TOKENS.Clock) private readonly clock: Clock,
+    @Inject(TOKENS.RequestSync) private readonly requestSync: Pick<RequestSync, 'execute'>,
   ) {}
 
   @Get('start')
@@ -67,10 +69,21 @@ export class OAuthController {
     if (typeof code !== 'string' || !code) return fail(res, entry.returnTo, MESSAGES.failed);
     try {
       const account = await this.connect.complete(kind, { code, redirectUri: redirectUri(kind), verifier: entry.verifier });
+      await this.syncSoon(account.id);
       res.redirect(302, `${entry.returnTo}?connected=${encodeURIComponent(account.id)}`);
     } catch (e) {
       // Only domain messages (written for users) are shown; anything else may carry provider details.
       fail(res, entry.returnTo, e instanceof DomainError ? e.message : MESSAGES.failed);
+    }
+  }
+
+  /** Asks the worker for an immediate first sync of a new or reconnected account; never fails the connection. */
+  private async syncSoon(accountId: string): Promise<void> {
+    try {
+      await this.requestSync.execute({ accountId });
+    } catch (e) {
+      // The message is logged without the request context (no codes, tokens or provider payloads).
+      this.logger.warn(`Could not request the first sync of account ${accountId}: ${e instanceof Error ? e.message : 'unknown error'}`);
     }
   }
 

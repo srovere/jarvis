@@ -23,15 +23,22 @@ function account(id: string, status: Account['status'] = 'active'): Account {
 }
 
 class FakeRequests implements SyncRequests {
+  /** Pending ids; `at` holds each request time (a counter, so later requests compare greater). */
   ids: string[] = [];
+  at = new Map<string, number>();
+  private clock = 0;
   async pending() {
-    return [...this.ids];
+    return this.ids.map((accountId) => ({ accountId, requestedAt: new Date(this.at.get(accountId) ?? 0) }));
   }
-  async clear(id: string) {
-    this.ids = this.ids.filter((i) => i !== id);
+  async clear(id: string, observedAt: Date) {
+    if ((this.at.get(id) ?? 0) <= observedAt.getTime()) this.ids = this.ids.filter((i) => i !== id);
   }
   async request(ids: string[]) {
-    this.ids.push(...ids);
+    this.clock += 1;
+    for (const id of ids) {
+      if (!this.ids.includes(id)) this.ids.push(id);
+      this.at.set(id, this.clock);
+    }
   }
 }
 
@@ -190,9 +197,9 @@ describe('SyncScheduler', () => {
     const { scheduler, syncer, requests, lines } = await setup([account('personal'), account('work')]);
     requests.ids = ['personal', 'work'];
     const clear = requests.clear.bind(requests);
-    requests.clear = async (id) => {
+    requests.clear = async (id, at) => {
       if (id === 'personal') throw new Error('db down');
-      return clear(id);
+      return clear(id, at);
     };
     await scheduler.poll();
     expect(syncer.execute.mock.calls).toEqual([['personal'], ['work']]);
@@ -200,5 +207,21 @@ describe('SyncScheduler', () => {
     expect(lines.map((l) => JSON.parse(l))).toContainEqual(
       expect.objectContaining({ msg: 'could not clear sync request', accountId: 'personal', error: 'db down' }),
     );
+  });
+
+  it('keeps a request that arrives while the account is syncing', async () => {
+    const { scheduler, syncer, requests } = await setup([account('personal'), account('work')]);
+    await requests.request(['work']);
+    syncer.execute.mockImplementation(async () => {
+      await requests.request(['work']); // user asks again during the sync
+      return OK;
+    });
+    await scheduler.poll();
+    expect(syncer.execute).toHaveBeenCalledTimes(1);
+    expect(requests.ids).toEqual(['work']);
+    syncer.execute.mockImplementation(async () => OK);
+    await scheduler.poll();
+    expect(syncer.execute).toHaveBeenCalledTimes(2);
+    expect(requests.ids).toEqual([]);
   });
 });

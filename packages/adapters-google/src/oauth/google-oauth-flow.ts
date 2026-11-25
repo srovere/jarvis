@@ -68,7 +68,7 @@ export class GoogleOAuthFlow {
     begin: (redirectUri: string) => Promise<AuthorizationStart>,
     label = 'a Google account',
   ): Promise<{ code: string; redirectUri: string; verifier: string }> {
-    let expectedState = '';
+    let expectedState: string | null = null;
     const { server, codePromise, cancelTimer } = this.listenForCallback(() => expectedState);
     try {
       const port = await this.listening(server);
@@ -117,7 +117,7 @@ export class GoogleOAuthFlow {
     });
   }
 
-  private listenForCallback(expectedState: () => string): { server: Server; codePromise: Promise<string>; cancelTimer: () => void } {
+  private listenForCallback(expectedState: () => string | null): { server: Server; codePromise: Promise<string>; cancelTimer: () => void } {
     let settle!: { resolve(code: string): void; reject(error: Error): void };
     const codePromise = new Promise<string>((resolve, reject) => {
       settle = { resolve, reject };
@@ -134,7 +134,8 @@ export class GoogleOAuthFlow {
       }
       const code = url.searchParams.get('code');
       const error = url.searchParams.get('error');
-      if (url.searchParams.get('state') !== expectedState()) {
+      const wanted = expectedState();
+      if (wanted === null || url.searchParams.get('state') !== wanted) {
         res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' }).end('Invalid state');
         return; // does not consume the attempt: the legitimate callback may still arrive
       }

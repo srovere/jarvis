@@ -5,6 +5,7 @@ import {
   type AccountRepository,
   type Clock,
   type SettingsProvider,
+  type PendingSyncRequest,
   type SyncRequests,
   type SyncStateRepository,
 } from '@jarvis/core';
@@ -82,18 +83,18 @@ export class SyncScheduler implements OnApplicationBootstrap, OnModuleDestroy {
   /** Syncs each account with a pending request and clears it; left pending while a tick is running. */
   private async syncRequested(): Promise<void> {
     if (this.running) return;
-    const ids = await this.requests.pending();
-    if (ids.length === 0) return;
+    const pending = await this.requests.pending();
+    if (pending.length === 0) return;
     // `pending()` is async: a tick may have started meanwhile, and syncs must stay serial.
     if (this.running) return;
-    this.running = this.syncAccounts(ids).finally(() => {
+    this.running = this.syncAccounts(pending).finally(() => {
       this.running = null;
     });
     await this.running;
   }
 
-  private async syncAccounts(ids: string[]): Promise<void> {
-    for (const id of ids) {
+  private async syncAccounts(pending: PendingSyncRequest[]): Promise<void> {
+    for (const { accountId: id, requestedAt } of pending) {
       try {
         const [outcome] = await this.runner.run(id);
         this.log(JSON.stringify({ level: 'info', msg: 'requested sync finished', accountId: id, error: outcome?.error }));
@@ -102,7 +103,8 @@ export class SyncScheduler implements OnApplicationBootstrap, OnModuleDestroy {
         this.log(JSON.stringify({ level: 'error', msg: 'requested sync failed', accountId: id, error }));
       }
       try {
-        await this.requests.clear(id);
+        // Compare-and-clear: a request made while this account was syncing stays pending.
+        await this.requests.clear(id, requestedAt);
       } catch (e) {
         const error = e instanceof Error ? e.message : String(e);
         this.log(JSON.stringify({ level: 'error', msg: 'could not clear sync request', accountId: id, error }));

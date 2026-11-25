@@ -112,6 +112,13 @@ export class ClaudeCliRunner implements AgentRunner {
     if (run.code === 0 && out.is_error === false) return { ok: true, latencyMs };
     if (out.api_error_status === 401) return { ok: false, reason: 'Token rejected: run `claude setup-token` again' };
     const reason = typeof out.result === 'string' && out.result.trim() ? out.result.trim() : `claude exited with code ${run.code}`;
-    return { ok: false, reason: reason.split(token).join('[redacted]') };
+    // Redact first, then cap: a token cut by the limit would otherwise survive partially.
+    return { ok: false, reason: capReason(reason.split(token).join('[redacted]')) };
   }
+}
+
+const MAX_REASON_CHARS = 500;
+
+function capReason(text: string): string {
+  return text.length <= MAX_REASON_CHARS ? text : `${text.slice(0, MAX_REASON_CHARS - 1)}…`;
 }

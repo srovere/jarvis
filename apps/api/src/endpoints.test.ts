@@ -19,7 +19,7 @@ import {
   type AgentStatusStore,
   type Preferences,
 } from '@jarvis/core';
-import { FixedClock, InMemoryRepositories, InMemorySettingsStore } from '@jarvis/core/testing';
+import { FixedClock, InMemoryRepositories, InMemorySettingsStore, InMemorySyncRequests } from '@jarvis/core/testing';
 import type { INestApplication } from '@nestjs/common';
 import { AbstractLoader, ExpressLoader } from '@nestjs/serve-static';
 import { Test } from '@nestjs/testing';
@@ -160,6 +160,8 @@ describe('api endpoints', () => {
   let clock: FixedClock;
   let clientSaved: string[];
   let clientPresent: boolean;
+  let syncRequests: InMemorySyncRequests;
+  let syncRequestFails: boolean;
   let clientDir: string | undefined;
 
   afterEach(async () => {
@@ -181,6 +183,8 @@ describe('api endpoints', () => {
     clock = new FixedClock(DateTime.fromISO('2026-11-24T10:00:00Z', { zone: 'utc' }));
     clientSaved = [];
     clientPresent = false;
+    syncRequests = new InMemorySyncRequests();
+    syncRequestFails = false;
     const fake = () => ({
       status: async () => (clientPresent ? 'present' : 'missing'),
       save: async (json: string) => {
@@ -212,6 +216,17 @@ describe('api endpoints', () => {
       .overrideProvider(EFFECTIVE_PREFERENCES)
       .useFactory({
         factory: () => ({ load: async () => (await settings.load()) ?? world.yaml ?? PREFS }),
+      })
+      .overrideProvider(TOKENS.SyncRequests)
+      .useFactory({
+        factory: () => ({
+          pending: () => syncRequests.pending(),
+          clear: (id: string, at: Date) => syncRequests.clear(id, at),
+          request: async (ids: string[]) => {
+            if (syncRequestFails) throw new Error('db down');
+            return syncRequests.request(ids);
+          },
+        }),
       })
       .overrideProvider(TOKENS.Clock)
       .useValue(clock)
@@ -550,6 +565,40 @@ describe('api endpoints', () => {
       expect(reconnected.statusDetail).toBeUndefined();
       expect(await repos.syncState.get('new', 'gmail')).toBe('cursor-1');
       expect(connector.saved).toEqual(['new']);
+    });
+
+    it('requests a sync for the connected account', async () => {
+      const port = await start();
+      clientPresent = true;
+      await start302(port);
+      await send(port, 'GET', '/api/oauth/google/callback?code=good&state=state-1');
+      expect((await syncRequests.pending()).map((r) => r.accountId)).toEqual(['new']);
+    });
+
+    it('requests a sync after a reconnect too', async () => {
+      const port = await start({ accounts: [account('new', 'needs_reauth', { statusDetail: 'x' })] });
+      clientPresent = true;
+      await start302(port);
+      await send(port, 'GET', '/api/oauth/google/callback?code=good&state=state-1');
+      expect((await syncRequests.pending()).map((r) => r.accountId)).toEqual(['new']);
+    });
+
+    it('still completes the connection when the sync request fails', async () => {
+      const port = await start();
+      clientPresent = true;
+      syncRequestFails = true;
+      await start302(port);
+      const r = await send(port, 'GET', '/api/oauth/google/callback?code=good&state=state-1');
+      expect(r.headers.location).toBe('/onboarding?connected=new');
+      expect((await repos.accounts.get('new')).status).toBe('active');
+    });
+
+    it('does not request a sync when the connection fails', async () => {
+      const port = await start();
+      clientPresent = true;
+      await start302(port);
+      await send(port, 'GET', '/api/oauth/google/callback?code=bad&state=state-1');
+      expect(await syncRequests.pending()).toEqual([]);
     });
 
     it('purges expired entries so they cannot be used and do not accumulate', async () => {
